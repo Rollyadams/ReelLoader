@@ -215,7 +215,7 @@ export default function App(){
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
         body:JSON.stringify({
-          model:"llama3-8b-8192",max_tokens:1000,temperature:0.3,
+          model:"llama-3.3-70b-versatile",max_tokens:1000,temperature:0.3,
           messages:[{role:"user",content:`List 5 recent AI technology news stories about: "${t.query}". Relevant to Nigerian/African businesses.\n\nReturn ONLY a JSON array, absolutely no other text:\n[{"title":"headline","summary":"2-3 sentence summary","source":"Publication","pubDate":"2025"}]\n\nReturn exactly 5 items.`}]
         })
       });
