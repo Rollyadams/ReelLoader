@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 
-const GROQ_KEY_STORAGE = "rat_groq_key";
+const GROQ_KEY_STORAGE = "rat_groq_key_v2";
 const APP_VERSION = "1.3.0";
 
 const NEWS_TOPICS = [
