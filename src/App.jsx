@@ -243,7 +243,7 @@ export default function App(){
         method:"POST",
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
         body:JSON.stringify({
-          model:"llama3-8b-8192",max_tokens:900,temperature:0.8,
+          model:"llama-3.3-70b-versatile",max_tokens:900,temperature:0.8,
           messages:[
             {role:"system",content:`Write short punchy explainer scripts for Instagram Reels for Rollyadams Techworld Nigeria (Solar, CCTV, Web/Apps). Guy 1 (speaker 0) = confused businessman, short questions. Guy 2 (speaker 1) = tech expert, clear answers. English. 6-8 lines. Max 20 words per line. End mentioning Rollyadams Techworld.`},
             {role:"user",content:`Script for: "${news.title}"\n\nReturn ONLY valid JSON array:\n[{"speaker":0,"line":"..."},{"speaker":1,"line":"..."}]`}
