@@ -4,10 +4,10 @@ const GROQ_KEY_STORAGE = "rat_groq_key_v2";
 const APP_VERSION = "1.3.0";
 
 const NEWS_TOPICS = [
-  { id: "cctv", label: "AI + Security", query: "AI security surveillance cameras 2025", emoji: "📷", color: "#e74c3c" },
-  { id: "solar", label: "AI + Solar & Energy", query: "AI solar energy power Nigeria 2025", emoji: "⚡", color: "#f39c12" },
-  { id: "webdev", label: "AI + Web & Apps", query: "AI web development tools 2025", emoji: "💻", color: "#3498db" },
-  { id: "general", label: "Hot AI News", query: "artificial intelligence news Africa 2025", emoji: "🤖", color: "#2ecc71" },
+  { id: "cctv", label: "AI + Security", query: "AI security cameras facial recognition threat detection 2025", emoji: "📷", color: "#e74c3c" },
+  { id: "solar", label: "AI + Solar & Energy", query: "AI energy grid optimization solar battery management 2025", emoji: "⚡", color: "#f39c12" },
+  { id: "webdev", label: "AI + Web & Apps", query: "AI builds apps writes code replaces developers 2025", emoji: "💻", color: "#3498db" },
+  { id: "general", label: "Hot AI News", query: "OpenAI Google Meta AI breakthrough release agent 2025", emoji: "🤖", color: "#2ecc71" },
 ];
 
 function drawConfusedGuy(ctx, x, y, size, speaking, dim) {
@@ -216,7 +216,19 @@ export default function App(){
         headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
         body:JSON.stringify({
           model:"llama-3.3-70b-versatile",max_tokens:1000,temperature:0.3,
-          messages:[{role:"user",content:`List 5 recent AI technology news stories about: "${t.query}". Relevant to Nigerian/African businesses.\n\nReturn ONLY a JSON array, absolutely no other text:\n[{"title":"headline","summary":"2-3 sentence summary","source":"Publication","pubDate":"2025"}]\n\nReturn exactly 5 items.`}]
+          messages:[{role:"user",content:`You are a viral social media content researcher. Find 5 of the most fascinating, scroll-stopping AI news stories related to: "${t.query}".
+
+Rules:
+- Global stories only (OpenAI, Google, Meta, startups, research labs)
+- Pick stories that would make someone stop scrolling and say "wait, WHAT?"
+- Focus on: breakthroughs, shocking capabilities, AI replacing jobs, AI tools anyone can use, controversies, record-breaking demos
+- Make headlines punchy and specific — not generic
+- Each story must feel urgent and relevant TODAY
+
+Return ONLY a JSON array, no other text:
+[{"title":"punchy specific headline","summary":"2 sentences that explain why this is shocking or useful","source":"Publication name","pubDate":"2025"}]
+
+Return exactly 5 items.`}]
         })
       });
       const data=await res.json();
@@ -245,7 +257,20 @@ export default function App(){
         body:JSON.stringify({
           model:"llama-3.3-70b-versatile",max_tokens:900,temperature:0.8,
           messages:[
-            {role:"system",content:`Write short punchy explainer scripts for Instagram Reels for Rollyadams Techworld Nigeria (Solar, CCTV, Web/Apps). Guy 1 (speaker 0) = confused businessman, short questions. Guy 2 (speaker 1) = tech expert, clear answers. English. 6-8 lines. Max 20 words per line. End mentioning Rollyadams Techworld.`},
+            {role:"system",content:`You write viral Instagram Reel and TikTok scripts for Rollyadams Techworld Nigeria — a tech company offering Solar/Inverter, CCTV Security, and Web/App development.
+
+Two characters:
+- Guy 1 (speaker 0): Shocked, confused regular person. Reactions like "Wait... WHAT?!", "No way!", "How is that even possible?"
+- Guy 2 (speaker 1): Calm, sharp tech expert. Explains clearly. Drops facts that blow minds.
+
+Script rules:
+- 6-8 lines total
+- Max 15 words per line
+- Start with the most shocking fact about the story
+- Build tension and curiosity throughout
+- End naturally with Guy 2 mentioning Rollyadams Techworld as the local expert
+- English only, conversational tone
+- Make it so good people HAVE to watch to the end`},
             {role:"user",content:`Script for: "${news.title}"\n\nReturn ONLY valid JSON array:\n[{"speaker":0,"line":"..."},{"speaker":1,"line":"..."}]`}
           ]
         })
