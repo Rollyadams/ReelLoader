@@ -353,21 +353,41 @@ export default function App() {
     setScreen("home");
   };
 
-  const callGroq = useCallback(async (prompt) => {
+  const callGroq = useCallback(async (prompt, isArray = false) => {
     const key = localStorage.getItem(GROQ_KEY_STORAGE) || groqKey;
     if (!key) throw new Error("No API key. Please add your Groq key.");
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
-      body: JSON.stringify({ model: GROQ_MODEL, max_tokens: 2000, temperature: 0.7, messages: [{ role: "user", content: prompt }] })
+      body: JSON.stringify({
+        model: GROQ_MODEL, max_tokens: 2000, temperature: 0.7,
+        messages: [
+          { role: "system", content: "You are a JSON API. You ONLY return valid JSON. No markdown, no backticks, no explanation, no preamble. Just raw JSON." },
+          { role: "user", content: prompt }
+        ]
+      })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
-    const text = data.choices?.[0]?.message?.content || "";
-    const clean = text.replace(/```json|```/g, "").trim();
-    const si = clean.indexOf("{"), ei = clean.lastIndexOf("}") + 1;
-    if (si === -1) throw new Error("Invalid response format");
-    return JSON.parse(clean.slice(si, ei));
+    let text = data.choices?.[0]?.message?.content || "";
+    // Strip any markdown or extra text
+    text = text.replace(/```json/gi, "").replace(/```/g, "").trim();
+    // Remove any text before first [ or {
+    const startChar = isArray ? "[" : "{";
+    const endChar = isArray ? "]" : "}";
+    const si = text.indexOf(startChar);
+    const ei = text.lastIndexOf(endChar) + 1;
+    if (si === -1) throw new Error("No JSON found in response");
+    const jsonStr = text.slice(si, ei);
+    try {
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      // Try to fix common issues: trailing commas, unescaped chars
+      const fixed = jsonStr
+        .replace(/,\s*([}\]])/g, "$1")  // trailing commas
+        .replace(/[\u0000-\u001F\u007F-\u009F]/g, " "); // control chars
+      return JSON.parse(fixed);
+    }
   }, [groqKey]);
 
   const fetchNews = useCallback(async (topicId) => {
@@ -375,7 +395,10 @@ export default function App() {
     setLoading(true); setError(""); setLoadMsg("🔍 Finding viral AI stories...");
     setSelectedTopic(topicId);
     try {
-      const result = await callGroq(`You are a viral content researcher. Find 5 shocking, scroll-stopping AI news stories about: "${t.query}".\n\nPick stories that would make someone stop scrolling. Focus on: record-breaking demos, AI replacing human jobs, shocking capabilities, major product launches, controversies, breakthroughs.\n\nMake headlines punchy and specific — never generic. Think: "ChatGPT just destroyed a $200k industry in one update" not "AI advances continue".\n\nReturn ONLY valid JSON array:\n[{"title":"punchy headline","summary":"2 sentences on why this is shocking","source":"Publication","pubDate":"2025"}]\n\nReturn exactly 5 items.`);
+      const result = await callGroq(
+        `Find 5 shocking AI news stories about the topic: ${t.query}. Make headlines punchy and specific. Return a JSON array of exactly 5 objects: [{"title":"headline","summary":"2 sentences","source":"Publication","pubDate":"2025"}]`,
+        true
+      );
       setNewsItems(Array.isArray(result) ? result : []);
       setScreen("news");
     } catch (e) {
