@@ -1,602 +1,604 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
-const GROQ_KEY_STORAGE = "rat_groq_key_v2";
-const APP_VERSION = "1.3.0";
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const GROQ_KEY_STORAGE = "rat_studio_key_v1";
+const APP_VERSION = "2.0.0";
 
-const NEWS_TOPICS = [
-  { id: "cctv", label: "AI + Security", query: "AI security cameras facial recognition threat detection 2025", emoji: "📷", color: "#e74c3c" },
-  { id: "solar", label: "AI + Solar & Energy", query: "AI energy grid optimization solar battery management 2025", emoji: "⚡", color: "#f39c12" },
-  { id: "webdev", label: "AI + Web & Apps", query: "AI builds apps writes code replaces developers 2025", emoji: "💻", color: "#3498db" },
-  { id: "general", label: "Hot AI News", query: "OpenAI Google Meta AI breakthrough release agent 2025", emoji: "🤖", color: "#2ecc71" },
+const FORMATS = [
+  {
+    id: "didyouknow",
+    icon: "⚡",
+    label: "Did You Know",
+    sub: "5 shocking AI facts as cards",
+    desc: "Scroll-stopping text cards. One shocking AI fact per card. Perfect for saves and shares.",
+  },
+  {
+    id: "beforeafter",
+    icon: "↔",
+    label: "Before / After AI",
+    sub: "Contrast that stops the scroll",
+    desc: "Show exactly what changed. Manual vs AI. Pure contrast. No words needed to understand the value.",
+  },
+  {
+    id: "toolofday",
+    icon: "🛠",
+    label: "AI Tool of the Day",
+    sub: "Real tools + your services",
+    desc: "One powerful AI tool explained simply. What it does, who it helps, how to start. Builds followers fast.",
+  },
+  {
+    id: "60seconds",
+    icon: "⏱",
+    label: "60-Second Reel",
+    sub: "Voiceover + text overlay script",
+    desc: "Professional news-energy reel. Timestamped script + shot-by-shot breakdown + text overlays.",
+  },
+  {
+    id: "thisaican",
+    icon: "🔥",
+    label: "This AI Can...",
+    sub: "Hook → Explain → Convert",
+    desc: "Open with the most shocking capability. Build curiosity. Close with your service. Maximum retention.",
+  },
 ];
 
-function drawConfusedGuy(ctx, x, y, size, speaking, dim) {
-  ctx.save(); ctx.globalAlpha = dim ? 0.4 : 1;
-  const s = size / 120; ctx.translate(x - size / 2, y - size / 2); ctx.scale(s, s);
-  ctx.fillStyle = "#1e3a5f"; roundRect(ctx, 30, 70, 60, 46, 10); ctx.fill();
-  ctx.fillStyle = "#fff"; roundRect(ctx, 48, 70, 11, 20, 2); ctx.fill(); roundRect(ctx, 61, 70, 11, 20, 2); ctx.fill();
-  ctx.fillStyle = "#2ecc71"; ctx.beginPath(); ctx.moveTo(60,73); ctx.lineTo(55,87); ctx.lineTo(60,92); ctx.lineTo(65,87); ctx.closePath(); ctx.fill();
-  ctx.fillStyle = "#f0b97a"; roundRect(ctx, 52, 57, 16, 15, 5); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(60, 44, 27, 29, 0, 0, Math.PI*2); ctx.fill();
-  ctx.fillStyle = "#2c1a0e"; ctx.beginPath(); ctx.ellipse(60, 17, 27, 11, 0, 0, Math.PI*2); ctx.fill(); ctx.fillRect(33,17,54,13);
-  ctx.fillStyle="white"; ctx.beginPath(); ctx.ellipse(49,42,6.5,speaking?7.5:5.5,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(71,42,6.5,speaking?7.5:5.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="#1a1a2e"; ctx.beginPath(); ctx.arc(50.5,43,3.2,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(72.5,43,3.2,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(51.5,41.5,1.1,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(73.5,41.5,1.1,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle="#2c1a0e"; ctx.lineWidth=2.5; ctx.lineCap="round";
-  ctx.beginPath(); ctx.moveTo(43,33); ctx.quadraticCurveTo(49.5,28.5,56,33); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(64,33); ctx.quadraticCurveTo(70.5,28.5,77,33); ctx.stroke();
-  if(speaking){ctx.fillStyle="#c0392b"; ctx.beginPath(); ctx.ellipse(60,58.5,7.5,5.5,0,0,Math.PI*2); ctx.fill();}
-  else{ctx.strokeStyle="#c0392b"; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(52,58); ctx.quadraticCurveTo(60,64,68,58); ctx.stroke();}
-  ctx.fillStyle="#dfa060"; ctx.beginPath(); ctx.ellipse(33,44,5,7.5,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(87,44,5,7.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="#1e3a5f"; roundRect(ctx,12,72,18,9,4.5); ctx.fill(); roundRect(ctx,90,72,18,9,4.5); ctx.fill();
-  if(!speaking){ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(96,20,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle="#1e3a5f"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(96,20,15,0,Math.PI*2); ctx.stroke(); ctx.fillStyle="#1e3a5f"; ctx.font="bold 17px sans-serif"; ctx.textAlign="center"; ctx.fillText("?",96,26);}
-  ctx.restore();
+const TOPICS = [
+  { id: "security", label: "AI + Security & CCTV", emoji: "📷", query: "AI security surveillance facial recognition threat detection 2025" },
+  { id: "solar", label: "AI + Solar & Energy", emoji: "⚡", query: "AI energy optimization solar smart grid battery 2025" },
+  { id: "webapps", label: "AI + Web & Apps", emoji: "💻", query: "AI coding tools app builders no-code automation developers 2025" },
+  { id: "tools", label: "AI Tools (Global)", emoji: "🛠", query: "best AI tools productivity business ChatGPT Claude Gemini 2025" },
+  { id: "breaking", label: "Breaking AI News", emoji: "🔴", query: "OpenAI Google Meta Anthropic AI breakthrough launch release 2025" },
+  { id: "business", label: "AI & Business", emoji: "💼", query: "AI replacing jobs business automation ROI revenue 2025" },
+];
+
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+
+// ─── PROMPTS PER FORMAT ───────────────────────────────────────────────────────
+function buildPrompt(format, topic, news) {
+  const base = `You are a viral social media content strategist for Rollyadams Techworld — a Nigerian tech company offering Solar/Inverter systems, CCTV Security, and Website & App Development. You create content for Instagram Reels and TikTok that stops scrolling, drives saves, and builds followers.`;
+
+  const story = `NEWS STORY:\nTitle: "${news.title}"\nSummary: "${news.summary}"`;
+
+  const prompts = {
+    didyouknow: `${base}\n\n${story}\n\nCreate 5 "Did You Know" fact cards about this AI story. Each card must:\n- Open with "Did you know..." or a shocking stat\n- Be 1-2 punchy sentences max\n- Get progressively more mind-blowing\n- Card 5 should naturally mention Rollyadams Techworld\n\nAlso generate:\n- A viral caption (under 150 chars)\n- 8 hashtags\n- Best time to post\n\nReturn ONLY valid JSON:\n{"cards":[{"number":1,"headline":"Did you know...","body":"1-2 sentences"},...],"caption":"...","hashtags":["#tag",...],"postTime":"...","visualTip":"Brief tip on how to design these cards visually"}`,
+
+    beforeafter: `${base}\n\n${story}\n\nCreate a "Before AI vs After AI" comparison post. Make the contrast dramatic and undeniable.\n\nFormat:\n- 3 comparison points (before → after)\n- Each point: short, punchy, specific numbers where possible\n- Hook line for the post\n- Tie point 3 to Rollyadams Techworld naturally\n\nAlso generate:\n- Viral caption\n- 8 hashtags\n- Visual direction (colors, layout)\n\nReturn ONLY valid JSON:\n{"hook":"...","comparisons":[{"label":"Point 1","before":"...","after":"..."},...],"caption":"...","hashtags":["#tag",...],"visualDirection":"...","postTime":"..."}`,
+
+    toolofday: `${base}\n\n${story}\n\nCreate an "AI Tool of the Day" post. Feature a REAL, important AI tool related to this story.\n\nInclude:\n- Tool name and what it actually does\n- Who it's for (be specific)\n- 3 killer features\n- Price (free/paid/freemium)\n- One line connecting it to Rollyadams Techworld's services\n- A "Try it" call to action\n\nAlso: suggest a SECOND tool that pairs well with the first.\n\nReturn ONLY valid JSON:\n{"toolName":"...","tagline":"...","whatItDoes":"...","whoItsFor":"...","features":["...","...","..."],"pricing":"...","rolladamsAngle":"...","cta":"...","pairWith":{"name":"...","reason":"..."},"caption":"...","hashtags":["#tag",...],"postTime":"..."}`,
+
+    "60seconds": `${base}\n\n${story}\n\nWrite a complete 60-second Instagram Reel / TikTok script. Professional, news-energy, authoritative.\n\nFormat — Shot by shot WITH timestamps:\n- 00:00-00:03: Hook (most shocking statement)\n- 00:03-00:10: Context (what is this?)\n- 00:10-00:25: The main story (3 key points)\n- 00:25-00:45: Why it matters to YOU (viewer)\n- 00:45-00:55: What to do next\n- 00:55-01:00: Rollyadams Techworld close\n\nFor EACH shot provide:\n- Voiceover text (what to say)\n- Text overlay (bold text on screen)\n- Visual suggestion (what to show)\n\nReturn ONLY valid JSON:\n{"title":"...","shots":[{"timestamp":"00:00-00:03","voiceover":"...","textOverlay":"...","visual":"..."},...],"caption":"...","hashtags":["#tag",...],"audioVibe":"...","postTime":"..."}`,
+
+    thisaican: `${base}\n\n${story}\n\nWrite a "This AI Can..." hook-format script. Maximum curiosity gap. Built for retention.\n\nStructure:\n1. HOOK: Open with the single most shocking capability (1 sentence, starts with "This AI can...")\n2. PROOF: 3 specific examples of what it can do (each under 15 words)\n3. TWIST: The part most people don't know (the surprising detail)\n4. STAKES: What happens to people/businesses that ignore this\n5. BRIDGE: How Rollyadams Techworld helps you stay ahead\n6. CTA: Clear next step\n\nAlso provide:\n- Text overlays for each section\n- Thumbnail text (what to write on the cover image)\n- Full caption\n- 8 hashtags\n\nReturn ONLY valid JSON:\n{"hook":"...","proof":["...","...","..."],"twist":"...","stakes":"...","bridge":"...","cta":"...","textOverlays":{"hook":"...","proof":"...","twist":"...","stakes":"...","bridge":"..."},"thumbnailText":"...","caption":"...","hashtags":["#tag",...],"postTime":"..."}`,
+  };
+
+  return prompts[format];
 }
 
-function drawSmartGuy(ctx, x, y, size, speaking, dim) {
-  ctx.save(); ctx.globalAlpha = dim ? 0.4 : 1;
-  const s = size / 120; ctx.translate(x - size / 2, y - size / 2); ctx.scale(s, s);
-  ctx.fillStyle="#0f3460"; roundRect(ctx,28,70,64,46,10); ctx.fill();
-  ctx.fillStyle="#0a2040"; roundRect(ctx,33,77,20,16,4); ctx.fill();
-  ctx.fillStyle="#2ecc71"; roundRect(ctx,39,73,3.5,14,1.5); ctx.fill();
-  ctx.fillStyle="#e74c3c"; roundRect(ctx,45,73,3.5,12,1.5); ctx.fill();
-  ctx.fillStyle="#c97c4a"; roundRect(ctx,52,57,16,15,5); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(60,43,26,28,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="#1a0800"; ctx.beginPath(); ctx.ellipse(60,16,26,10,0,0,Math.PI*2); ctx.fill(); ctx.fillRect(34,16,52,12);
-  ctx.strokeStyle="#1a1a2e"; ctx.lineWidth=2.2;
-  roundRect(ctx,41,37,15,11,4.5); ctx.stroke(); roundRect(ctx,64,37,15,11,4.5); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(56,42.5); ctx.lineTo(64,42.5); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(34,42.5); ctx.lineTo(41,42.5); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(79,42.5); ctx.lineTo(86,42.5); ctx.stroke();
-  ctx.fillStyle="white"; ctx.beginPath(); ctx.ellipse(48.5,42.5,4.5,speaking?5.5:4,0,0,Math.PI*2); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(71.5,42.5,4.5,speaking?5.5:4,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="#1a1a2e"; ctx.beginPath(); ctx.arc(49.5,43,2.8,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(72.5,43,2.8,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="white"; ctx.beginPath(); ctx.arc(50.5,41.5,0.9,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(73.5,41.5,0.9,0,Math.PI*2); ctx.fill();
-  ctx.strokeStyle="#1a0800"; ctx.lineWidth=2.5; ctx.lineCap="round";
-  ctx.beginPath(); ctx.moveTo(43,34); ctx.quadraticCurveTo(48.5,31,54,34); ctx.stroke();
-  ctx.beginPath(); ctx.moveTo(66,34); ctx.quadraticCurveTo(71.5,31,77,34); ctx.stroke();
-  if(speaking){ctx.fillStyle="#7b1f1f"; ctx.beginPath(); ctx.ellipse(60,57,7,4.5,0,0,Math.PI*2); ctx.fill();}
-  else{ctx.strokeStyle="#7b1f1f"; ctx.lineWidth=2.5; ctx.beginPath(); ctx.moveTo(52,56); ctx.quadraticCurveTo(60,61,68,56); ctx.stroke();}
-  ctx.fillStyle="#b36840"; ctx.beginPath(); ctx.ellipse(34,43,5,7.5,0,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.ellipse(86,43,5,7.5,0,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle="#0f3460"; roundRect(ctx,10,72,18,9,4.5); ctx.fill(); roundRect(ctx,92,72,18,9,4.5); ctx.fill();
-  if(speaking){ctx.fillStyle="#fff9e0"; ctx.beginPath(); ctx.arc(96,18,15,0,Math.PI*2); ctx.fill(); ctx.strokeStyle="#f39c12"; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(96,18,15,0,Math.PI*2); ctx.stroke(); ctx.font="16px sans-serif"; ctx.textAlign="center"; ctx.fillText("💡",96,24);}
-  ctx.restore();
-}
-
-function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();}
-
-function drawFrame(canvas,script,currentLine,displayLine,selectedNews,topicEmoji,mouthOpen){
-  const ctx=canvas.getContext("2d"),W=canvas.width,H=canvas.height;
-  const grad=ctx.createLinearGradient(0,0,0,H); grad.addColorStop(0,"#0d1b2e"); grad.addColorStop(0.5,"#0a2540"); grad.addColorStop(1,"#081828");
-  ctx.fillStyle=grad; ctx.fillRect(0,0,W,H);
-  ctx.fillStyle="#2ecc71"; ctx.font="bold 22px sans-serif"; ctx.textAlign="center"; ctx.fillText("Rollyadams Techworld",W/2,52);
-  if(selectedNews?.title){ctx.fillStyle="rgba(46,204,113,0.12)"; roundRect(ctx,20,68,W-40,56,12); ctx.fill(); ctx.strokeStyle="rgba(46,204,113,0.3)"; ctx.lineWidth=1.5; roundRect(ctx,20,68,W-40,56,12); ctx.stroke(); ctx.fillStyle="#4ade80"; ctx.font="bold 18px sans-serif"; ctx.fillText((topicEmoji+" "+selectedNews.title).slice(0,55)+"...",W/2,102);}
-  const charY=H*0.48,charSize=140;
-  const g1s=currentLine>=0&&script[currentLine]?.speaker===0&&mouthOpen;
-  const g2s=currentLine>=0&&script[currentLine]?.speaker===1&&mouthOpen;
-  const g1d=currentLine>=0&&script[currentLine]?.speaker===1;
-  const g2d=currentLine>=0&&script[currentLine]?.speaker===0;
-  drawConfusedGuy(ctx,W*0.27,charY,charSize,g1s,g1d); drawSmartGuy(ctx,W*0.73,charY,charSize,g2s,g2d);
-  ctx.font="bold 16px sans-serif"; ctx.textAlign="center"; ctx.fillStyle="#4b6a8a";
-  ctx.fillText("Guy 1",W*0.27,charY+charSize*0.5+18); ctx.fillText("Guy 2",W*0.73,charY+charSize*0.5+18);
-  if(displayLine&&currentLine>=0){
-    const barY=H-140; ctx.fillStyle="rgba(8,20,40,0.93)"; roundRect(ctx,16,barY,W-32,90,14); ctx.fill();
-    const sc=script[currentLine]?.speaker===0?"● GUY 1":"● GUY 2"; const sc2=script[currentLine]?.speaker===0?"#7dd3fc":"#4ade80";
-    ctx.fillStyle=sc2; ctx.font="bold 14px sans-serif"; ctx.fillText(sc,W/2,barY+22);
-    ctx.fillStyle="#f8fafc"; ctx.font="bold 20px sans-serif";
-    const words=displayLine.split(" "); let l="",lines=[];
-    for(const w of words){const t=l+w+" "; if(ctx.measureText(t).width>W-64&&l){lines.push(l.trim());l=w+" ";}else l=t;} if(l)lines.push(l.trim());
-    lines.slice(0,2).forEach((ln,i)=>ctx.fillText(ln,W/2,barY+48+i*26));
-  }
-  if(script.length>0&&currentLine>=0){
-    const dotY=H-36,ds=18,tw=script.length*ds,sx=W/2-tw/2;
-    script.forEach((_,i)=>{ctx.fillStyle=i===currentLine?"#2ecc71":i<currentLine?"rgba(255,255,255,0.3)":"rgba(255,255,255,0.12)"; const dw=i===currentLine?20:7; roundRect(ctx,sx+i*ds-dw/2,dotY-3.5,dw,7,3.5); ctx.fill();});
-  }
-}
-
-function ConfusedGuy({speaking=false,size=120,dim=false}){
-  return(<svg width={size} height={size} viewBox="0 0 120 120" fill="none" style={{transition:"filter 0.3s,transform 0.3s",filter:dim?"brightness(0.45)":"brightness(1)",transform:speaking?"scale(1.06)":"scale(1)"}}>
-    <rect x="30" y="70" width="60" height="46" rx="10" fill="#1e3a5f"/>
-    <rect x="48" y="70" width="11" height="20" rx="2" fill="#fff"/><rect x="61" y="70" width="11" height="20" rx="2" fill="#fff"/>
-    <polygon points="60,73 55,87 60,92 65,87" fill="#2ecc71"/>
-    <rect x="52" y="57" width="16" height="15" rx="5" fill="#f0b97a"/>
-    <ellipse cx="60" cy="44" rx="27" ry="29" fill="#f0b97a"/>
-    <ellipse cx="60" cy="17" rx="27" ry="11" fill="#2c1a0e"/><rect x="33" y="17" width="54" height="13" fill="#2c1a0e"/>
-    <ellipse cx="49" cy="42" rx="6.5" ry={speaking?7.5:5.5} fill="white"/><ellipse cx="71" cy="42" rx="6.5" ry={speaking?7.5:5.5} fill="white"/>
-    <circle cx="50.5" cy="43" r="3.2" fill="#1a1a2e"/><circle cx="72.5" cy="43" r="3.2" fill="#1a1a2e"/>
-    <circle cx="51.5" cy="41.5" r="1.1" fill="white"/><circle cx="73.5" cy="41.5" r="1.1" fill="white"/>
-    <path d="M43 33 Q49.5 28.5 56 33" stroke="#2c1a0e" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    <path d="M64 33 Q70.5 28.5 77 33" stroke="#2c1a0e" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    {speaking?<ellipse cx="60" cy="58.5" rx="7.5" ry="5.5" fill="#c0392b"/>:<path d="M52 58 Q60 64 68 58" stroke="#c0392b" strokeWidth="2.5" fill="none" strokeLinecap="round"/>}
-    <ellipse cx="33" cy="44" rx="5" ry="7.5" fill="#dfa060"/><ellipse cx="87" cy="44" rx="5" ry="7.5" fill="#dfa060"/>
-    <rect x="12" y="72" width="18" height="9" rx="4.5" fill="#1e3a5f"/><rect x="90" y="72" width="18" height="9" rx="4.5" fill="#1e3a5f"/>
-    {!speaking&&(<g><circle cx="96" cy="20" r="15" fill="white" stroke="#1e3a5f" strokeWidth="2"/><text x="96" y="26" textAnchor="middle" fontSize="17" fill="#1e3a5f" fontWeight="bold" fontFamily="sans-serif">?</text></g>)}
-  </svg>);
-}
-
-function SmartGuy({speaking=false,size=120,dim=false}){
-  return(<svg width={size} height={size} viewBox="0 0 120 120" fill="none" style={{transition:"filter 0.3s,transform 0.3s",filter:dim?"brightness(0.45)":"brightness(1)",transform:speaking?"scale(1.06)":"scale(1)"}}>
-    <rect x="28" y="70" width="64" height="46" rx="10" fill="#0f3460"/>
-    <rect x="33" y="77" width="20" height="16" rx="4" fill="#0a2040"/>
-    <rect x="39" y="73" width="3.5" height="14" rx="1.5" fill="#2ecc71"/><rect x="45" y="73" width="3.5" height="12" rx="1.5" fill="#e74c3c"/>
-    <rect x="52" y="57" width="16" height="15" rx="5" fill="#c97c4a"/>
-    <ellipse cx="60" cy="43" rx="26" ry="28" fill="#c97c4a"/>
-    <ellipse cx="60" cy="16" rx="26" ry="10" fill="#1a0800"/><rect x="34" y="16" width="52" height="12" fill="#1a0800"/>
-    <rect x="41" y="37" width="15" height="11" rx="4.5" fill="none" stroke="#1a1a2e" strokeWidth="2.2"/>
-    <rect x="64" y="37" width="15" height="11" rx="4.5" fill="none" stroke="#1a1a2e" strokeWidth="2.2"/>
-    <line x1="56" y1="42.5" x2="64" y2="42.5" stroke="#1a1a2e" strokeWidth="2.2"/>
-    <line x1="34" y1="42.5" x2="41" y2="42.5" stroke="#1a1a2e" strokeWidth="1.8"/>
-    <line x1="79" y1="42.5" x2="86" y2="42.5" stroke="#1a1a2e" strokeWidth="1.8"/>
-    <ellipse cx="48.5" cy="42.5" rx="4.5" ry={speaking?5.5:4} fill="white"/><ellipse cx="71.5" cy="42.5" rx="4.5" ry={speaking?5.5:4} fill="white"/>
-    <circle cx="49.5" cy="43" r="2.8" fill="#1a1a2e"/><circle cx="72.5" cy="43" r="2.8" fill="#1a1a2e"/>
-    <circle cx="50.5" cy="41.5" r="0.9" fill="white"/><circle cx="73.5" cy="41.5" r="0.9" fill="white"/>
-    <path d="M43 34 Q48.5 31 54 34" stroke="#1a0800" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    <path d="M66 34 Q71.5 31 77 34" stroke="#1a0800" strokeWidth="2.5" fill="none" strokeLinecap="round"/>
-    {speaking?<ellipse cx="60" cy="57" rx="7" ry="4.5" fill="#7b1f1f"/>:<path d="M52 56 Q60 61 68 56" stroke="#7b1f1f" strokeWidth="2.5" fill="none" strokeLinecap="round"/>}
-    <ellipse cx="34" cy="43" rx="5" ry="7.5" fill="#b36840"/><ellipse cx="86" cy="43" rx="5" ry="7.5" fill="#b36840"/>
-    <rect x="10" y="72" width="18" height="9" rx="4.5" fill="#0f3460"/><rect x="92" y="72" width="18" height="9" rx="4.5" fill="#0f3460"/>
-    {speaking&&(<g><circle cx="96" cy="18" r="15" fill="#fff9e0" stroke="#f39c12" strokeWidth="2"/><text x="96" y="24" textAnchor="middle" fontSize="16" fontFamily="sans-serif">💡</text></g>)}
-  </svg>);
-}
-
-function SubtitleBar({text,speaker}){
-  if(!text)return null;
-  return(<div style={{position:"absolute",bottom:56,left:14,right:14,background:"rgba(8,20,40,0.93)",borderRadius:14,padding:"10px 16px",textAlign:"center",backdropFilter:"blur(12px)",border:"1px solid rgba(255,255,255,0.08)"}}>
-    <div style={{fontSize:10,color:speaker===0?"#7dd3fc":"#4ade80",fontFamily:"'Nunito',sans-serif",fontWeight:900,marginBottom:4,letterSpacing:1.5,textTransform:"uppercase"}}>{speaker===0?"● Guy 1":"● Guy 2"}</div>
-    <div style={{fontSize:14,color:"#f8fafc",fontFamily:"'Nunito',sans-serif",fontWeight:700,lineHeight:1.5}}>{text}</div>
-  </div>);
-}
-
-function ProgressDots({total,current}){
-  return(<div style={{display:"flex",justifyContent:"center",gap:5,padding:"8px 0"}}>
-    {Array.from({length:total}).map((_,i)=>(<div key={i} style={{width:i===current?22:7,height:7,borderRadius:3.5,background:i===current?"#2ecc71":i<current?"rgba(255,255,255,0.35)":"rgba(255,255,255,0.15)",transition:"all 0.35s ease"}}/>))}
-  </div>);
-}
-
-function Screen({children,bg="#f0f4f8",style={}}){
-  return(<div style={{minHeight:"100dvh",width:"100%",maxWidth:430,margin:"0 auto",background:bg,fontFamily:"'Nunito',sans-serif",position:"relative",overflowX:"hidden",...style}}>{children}</div>);
-}
-
-function TopNav({onBack,title,light=false}){
-  return(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px 12px",background:light?"rgba(255,255,255,0.08)":"transparent"}}>
-    <button onClick={onBack} style={{background:light?"rgba(255,255,255,0.12)":"#f1f5f9",border:"none",width:38,height:38,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",fontSize:18,color:light?"#fff":"#0a2540"}}>←</button>
-    <div style={{fontSize:15,fontWeight:800,color:light?"#fff":"#0a2540"}}>{title}</div>
-    <div style={{width:38}}/>
-  </div>);
-}
-
-function LoadingOverlay({message}){
-  return(<div style={{position:"fixed",inset:0,zIndex:999,background:"rgba(10,37,64,0.92)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,backdropFilter:"blur(6px)"}}>
-    <div style={{display:"flex",gap:16}}>
-      <div style={{animation:"float 2s ease-in-out infinite"}}><ConfusedGuy speaking={false} size={70}/></div>
-      <div style={{animation:"float 2s ease-in-out infinite 1s"}}><SmartGuy speaking={true} size={70}/></div>
-    </div>
-    <div style={{color:"#2ecc71",fontSize:15,fontWeight:800,textAlign:"center",maxWidth:220}}>{message}</div>
-    <div style={{display:"flex",gap:6}}>
-      {[0,1,2].map(i=>(<div key={i} style={{width:8,height:8,borderRadius:"50%",background:"#2ecc71",animation:`pulse 1.2s ease-in-out infinite ${i*0.2}s`}}/>))}
-    </div>
-  </div>);
-}
-
-export default function App(){
-  const [screen,setScreen]=useState("splash");
-  const [groqKey,setGroqKey]=useState(()=>localStorage.getItem(GROQ_KEY_STORAGE)||"");
-  const [keyInput,setKeyInput]=useState("");
-  const [topic,setTopic]=useState(null);
-  const [newsItems,setNewsItems]=useState([]);
-  const [selectedNews,setSelectedNews]=useState(null);
-  const [script,setScript]=useState([]);
-  const [loading,setLoading]=useState(false);
-  const [loadMsg,setLoadMsg]=useState("");
-  const [error,setError]=useState("");
-  const [approvedQueue,setApprovedQueue]=useState(()=>{try{return JSON.parse(localStorage.getItem("rat_queue")||"[]");}catch{return[];}});
-  const [playing,setPlaying]=useState(false);
-  const [currentLine,setCurrentLine]=useState(-1);
-  const [displayLine,setDisplayLine]=useState("");
-  const [mouthOpen,setMouthOpen]=useState(false);
-  const playingRef=useRef(false);
-  const canvasRef=useRef(null);
-  const [exporting,setExporting]=useState(false);
-  const [exportProgress,setExportProgress]=useState(0);
-  const [videoURL,setVideoURL]=useState("");
-
-  const topicObj=()=>NEWS_TOPICS.find(t=>t.id===topic)||NEWS_TOPICS[3];
-  const saveQueue=(q)=>{setApprovedQueue(q);localStorage.setItem("rat_queue",JSON.stringify(q));};
-  const saveKey=()=>{if(!keyInput.trim())return;localStorage.setItem(GROQ_KEY_STORAGE,keyInput.trim());setGroqKey(keyInput.trim());setError("");setScreen("topicSelect");};
-
-  const fetchNews=useCallback(async(topicId)=>{
-    const key=localStorage.getItem(GROQ_KEY_STORAGE)||groqKey;
-    if(!key){setError("No API key found. Please enter your Groq API key first.");setScreen("setup");return;}
-    setLoading(true);setError("");setLoadMsg("📡 Searching latest AI news...");setTopic(topicId);
-    const t=NEWS_TOPICS.find(x=>x.id===topicId);
-    try{
-      const res=await fetch("https://api.groq.com/openai/v1/chat/completions",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
-        body:JSON.stringify({
-          model:"llama-3.3-70b-versatile",max_tokens:1000,temperature:0.3,
-          messages:[{role:"user",content:`You are a viral social media content researcher. Find 5 of the most fascinating, scroll-stopping AI news stories related to: "${t.query}".
-
-Rules:
-- Global stories only (OpenAI, Google, Meta, startups, research labs)
-- Pick stories that would make someone stop scrolling and say "wait, WHAT?"
-- Focus on: breakthroughs, shocking capabilities, AI replacing jobs, AI tools anyone can use, controversies, record-breaking demos
-- Make headlines punchy and specific — not generic
-- Each story must feel urgent and relevant TODAY
-
-Return ONLY a JSON array, no other text:
-[{"title":"punchy specific headline","summary":"2 sentences that explain why this is shocking or useful","source":"Publication name","pubDate":"2025"}]
-
-Return exactly 5 items.`}]
-        })
-      });
-      const data=await res.json();
-      if(!res.ok){throw new Error(data.error?.message||`HTTP ${res.status}`);}
-      const text=data.choices?.[0]?.message?.content||"";
-      const clean=text.replace(/```json|```/g,"").trim();
-      const si=clean.indexOf("["),ei=clean.lastIndexOf("]")+1;
-      if(si===-1)throw new Error("No JSON found in response: "+clean.slice(0,100));
-      const parsed=JSON.parse(clean.slice(si,ei));
-      if(!parsed.length)throw new Error("Empty news list returned");
-      setNewsItems(parsed.filter(i=>i.title?.length>5));
-      setScreen("news");
-    }catch(e){
-      setError("❌ "+e.message);
-      setScreen("topicSelect");
-    }finally{setLoading(false);}
-  },[groqKey]);
-
-  const generateScript=useCallback(async(news)=>{
-    const key=localStorage.getItem(GROQ_KEY_STORAGE)||groqKey;
-    setSelectedNews(news);setLoading(true);setError("");setLoadMsg("✍️ Writing your script...");
-    try{
-      const res=await fetch("https://api.groq.com/openai/v1/chat/completions",{
-        method:"POST",
-        headers:{"Content-Type":"application/json","Authorization":`Bearer ${key}`},
-        body:JSON.stringify({
-          model:"llama-3.3-70b-versatile",max_tokens:900,temperature:0.8,
-          messages:[
-            {role:"system",content:`You write viral Instagram Reel and TikTok scripts for Rollyadams Techworld Nigeria — a tech company offering Solar/Inverter, CCTV Security, and Web/App development.
-
-Two characters:
-- Guy 1 (speaker 0): Shocked, confused regular person. Reactions like "Wait... WHAT?!", "No way!", "How is that even possible?"
-- Guy 2 (speaker 1): Calm, sharp tech expert. Explains clearly. Drops facts that blow minds.
-
-Script rules:
-- 6-8 lines total
-- Max 15 words per line
-- Start with the most shocking fact about the story
-- Build tension and curiosity throughout
-- End naturally with Guy 2 mentioning Rollyadams Techworld as the local expert
-- English only, conversational tone
-- Make it so good people HAVE to watch to the end`},
-            {role:"user",content:`Script for: "${news.title}"\n\nReturn ONLY valid JSON array:\n[{"speaker":0,"line":"..."},{"speaker":1,"line":"..."}]`}
-          ]
-        })
-      });
-      const data=await res.json();
-      if(!res.ok)throw new Error(data.error?.message||`HTTP ${res.status}`);
-      const text=data.choices?.[0]?.message?.content||"";
-      const clean=text.replace(/```json|```/g,"").trim();
-      const parsed=JSON.parse(clean.slice(clean.indexOf("["),clean.lastIndexOf("]")+1));
-      if(!Array.isArray(parsed)||!parsed.length)throw new Error("Empty script");
-      setScript(parsed);setScreen("script");
-    }catch(e){setError("❌ "+e.message);setScreen("news");}
-    finally{setLoading(false);}
-  },[groqKey]);
-
-  const speak=useCallback((text,speaker,onEnd)=>{
-    window.speechSynthesis.cancel();
-    const utt=new SpeechSynthesisUtterance(text);
-    utt.rate=speaker===0?0.88:1.0;utt.pitch=speaker===0?0.95:1.1;utt.volume=1;
-    const voices=window.speechSynthesis.getVoices();
-    const v=voices.find(v=>v.lang.startsWith("en"))||voices[0];
-    if(v)utt.voice=v;
-    utt.onend=()=>{if(playingRef.current)onEnd();};
-    utt.onerror=()=>{if(playingRef.current)onEnd();};
-    window.speechSynthesis.speak(utt);
-  },[]);
-
-  const playScript=useCallback(()=>{
-    if(!script.length)return;
-    playingRef.current=true;setPlaying(true);setCurrentLine(0);
-    let idx=0;
-    const playLine=()=>{
-      if(!playingRef.current||idx>=script.length){setPlaying(false);setCurrentLine(-1);setDisplayLine("");setMouthOpen(false);playingRef.current=false;return;}
-      setCurrentLine(idx);setDisplayLine(script[idx].line);setMouthOpen(true);
-      speak(script[idx].line,script[idx].speaker,()=>{setMouthOpen(false);idx++;setTimeout(playLine,350);});
-    };
-    playLine();
-  },[script,speak]);
-
-  const stopPlay=useCallback(()=>{playingRef.current=false;window.speechSynthesis.cancel();setPlaying(false);setCurrentLine(-1);setDisplayLine("");setMouthOpen(false);},[]);
-
-  const exportVideo=useCallback(async()=>{
-    if(!script.length||!canvasRef.current)return;
-    setExporting(true);setExportProgress(0);setVideoURL("");
-    const canvas=canvasRef.current;canvas.width=540;canvas.height=960;
-    const canvasStream=canvas.captureStream(30);
-    const mimeType=MediaRecorder.isTypeSupported("video/webm;codecs=vp9")?"video/webm;codecs=vp9":"video/webm";
-    const recorder=new MediaRecorder(canvasStream,{mimeType,videoBitsPerSecond:2500000});
-    const chunks=[];
-    recorder.ondataavailable=e=>{if(e.data.size>0)chunks.push(e.data);};
-    drawFrame(canvas,[],- 1,"",selectedNews,topicObj().emoji,false);
-    recorder.start(100);
-    let mouthState=false,blinkInterval=null;
-    const stopBlink=()=>{if(blinkInterval){clearInterval(blinkInterval);blinkInterval=null;}};
-    const processLine=(idx)=>new Promise((resolve)=>{
-      if(idx>=script.length){resolve();return;}
-      const line=script[idx];setCurrentLine(idx);setDisplayLine(line.line);
-      stopBlink();mouthState=true;
-      blinkInterval=setInterval(()=>{mouthState=!mouthState;drawFrame(canvas,script,idx,line.line,selectedNews,topicObj().emoji,mouthState);},180);
-      setExportProgress(Math.round((idx/script.length)*90));
-      const utt=new SpeechSynthesisUtterance(line.line);
-      utt.rate=line.speaker===0?0.88:1.0;utt.pitch=line.speaker===0?0.95:1.1;
-      const voices=window.speechSynthesis.getVoices();const v=voices.find(v=>v.lang.startsWith("en"))||voices[0];if(v)utt.voice=v;
-      utt.onend=()=>{stopBlink();mouthState=false;drawFrame(canvas,script,idx,line.line,selectedNews,topicObj().emoji,false);setTimeout(resolve,350);};
-      utt.onerror=()=>{stopBlink();resolve();};
-      window.speechSynthesis.speak(utt);
-    });
-    for(let i=0;i<script.length;i++)await processLine(i);
-    setCurrentLine(-1);setDisplayLine("");
-    drawFrame(canvas,script,-1,"",selectedNews,topicObj().emoji,false);
-    await new Promise(r=>setTimeout(r,800));
-    setExportProgress(95);recorder.stop();
-    recorder.onstop=()=>{const blob=new Blob(chunks,{type:"video/webm"});setVideoURL(URL.createObjectURL(blob));setExportProgress(100);setExporting(false);setScreen("done");};
-  },[script,selectedNews,topic]);
-
-  const approvePost=()=>{saveQueue([{id:Date.now(),topic:topicObj().label,topicEmoji:topicObj().emoji,news:selectedNews,script,approvedAt:new Date().toLocaleString("en-GB")},...approvedQueue]);setScreen("approved");};
-
-  useEffect(()=>{window.speechSynthesis.getVoices();window.speechSynthesis.onvoiceschanged=()=>window.speechSynthesis.getVoices();return()=>{window.speechSynthesis.cancel();};},[]);
-
-  if(screen==="splash")return(
-    <Screen bg="linear-gradient(160deg,#0a1628 0%,#0f2744 50%,#0a2540 100%)">
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100dvh",padding:"0 28px"}}>
-        <div style={{display:"flex",gap:28,alignItems:"flex-end",marginBottom:36}}>
-          <div style={{animation:"float 3.2s ease-in-out infinite"}}><ConfusedGuy speaking={false} size={95}/></div>
-          <div style={{animation:"float 3.2s ease-in-out infinite 1.6s"}}><SmartGuy speaking={true} size={95}/></div>
-        </div>
-        <div style={{fontSize:11,color:"#2ecc71",letterSpacing:4,textTransform:"uppercase",fontWeight:900,marginBottom:10}}>Rollyadams Techworld</div>
-        <h1 style={{color:"#fff",fontSize:36,fontWeight:900,textAlign:"center",margin:"0 0 12px",lineHeight:1.15}}>AI Content<br/>Engine</h1>
-        <p style={{color:"#7dd3fc",fontSize:15,textAlign:"center",margin:"0 0 52px",lineHeight:1.65,maxWidth:260}}>Find AI news → Script → Animated video → Download</p>
-        <button onClick={()=>setScreen(groqKey?"topicSelect":"setup")} style={{background:"linear-gradient(135deg,#2ecc71,#1fa355)",border:"none",color:"#fff",padding:"17px 52px",borderRadius:50,fontSize:17,fontWeight:900,cursor:"pointer",boxShadow:"0 8px 36px rgba(46,204,113,0.38)"}}>Get Started →</button>
-        {approvedQueue.length>0&&<button onClick={()=>setScreen("queue")} style={{marginTop:16,background:"none",border:"none",color:"#4b6a8a",fontSize:13,cursor:"pointer",fontWeight:700}}>📋 Queue ({approvedQueue.length})</button>}
-        <div style={{position:"absolute",bottom:20,color:"#1e3a5f",fontSize:11}}>v{APP_VERSION}</div>
-      </div>
-      <style>{`@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.7;transform:scale(0.97)}}`}</style>
-    </Screen>
+// ─── COMPONENTS ───────────────────────────────────────────────────────────────
+function CopyBtn({ text }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    navigator.clipboard?.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
+  };
+  return (
+    <button onClick={copy} style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid #333", background: copied ? "#d4af37" : "transparent", color: copied ? "#000" : "#888", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.2s", fontFamily: "'Space Grotesk',sans-serif" }}>
+      {copied ? "✓ Copied" : "Copy"}
+    </button>
   );
+}
 
-  if(screen==="setup")return(
-    <Screen>
-      <TopNav onBack={()=>setScreen("splash")} title="API Setup"/>
-      <div style={{padding:"24px 24px 40px"}}>
-        <div style={{textAlign:"center",marginBottom:32}}>
-          <div style={{fontSize:52,marginBottom:14}}>🔑</div>
-          <h2 style={{color:"#0a2540",fontSize:24,fontWeight:900,marginBottom:8}}>Connect Groq AI</h2>
-          <p style={{color:"#64748b",fontSize:14,lineHeight:1.7}}>Free at <strong style={{color:"#0f3460"}}>console.groq.com</strong><br/>Sign up → API Keys → Create key</p>
+function Tag({ text }) {
+  return <span style={{ display: "inline-block", background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#d4af37", fontSize: 12, padding: "3px 10px", borderRadius: 20, margin: "3px 3px 3px 0", fontFamily: "monospace" }}>{text}</span>;
+}
+
+function Card({ children, style = {} }) {
+  return <div style={{ background: "#111", border: "1px solid #222", borderRadius: 16, padding: "18px 20px", marginBottom: 14, ...style }}>{children}</div>;
+}
+
+function Label({ children }) {
+  return <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8, fontFamily: "'Space Grotesk',sans-serif" }}>{children}</div>;
+}
+
+function SectionTitle({ children }) {
+  return <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", marginBottom: 10, fontFamily: "'Space Grotesk',sans-serif" }}>{children}</div>;
+}
+
+// ─── OUTPUT RENDERERS ─────────────────────────────────────────────────────────
+function DidYouKnowOutput({ data }) {
+  return (
+    <div>
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)" }}>
+        <Label>📋 Caption</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>{data.caption}</div>
+        <CopyBtn text={data.caption} />
+      </Card>
+      <Card>
+        <Label>🎨 Visual Tip</Label>
+        <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>{data.visualTip}</div>
+      </Card>
+      {data.cards?.map((card, i) => (
+        <Card key={i} style={{ borderLeft: "3px solid #d4af37" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+            <div style={{ width: 28, height: 28, borderRadius: "50%", background: "#d4af37", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 900, flexShrink: 0 }}>{card.number}</div>
+            <CopyBtn text={`${card.headline}\n\n${card.body}`} />
+          </div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: "#d4af37", marginBottom: 8, lineHeight: 1.3, fontFamily: "'Space Grotesk',sans-serif" }}>{card.headline}</div>
+          <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.6 }}>{card.body}</div>
+        </Card>
+      ))}
+      <Card>
+        <Label>🏷 Hashtags</Label>
+        <div>{data.hashtags?.map((h, i) => <Tag key={i} text={h} />)}</div>
+      </Card>
+      <Card>
+        <Label>🕐 Best Time to Post</Label>
+        <div style={{ color: "#d4af37", fontSize: 14, fontWeight: 700 }}>{data.postTime}</div>
+      </Card>
+    </div>
+  );
+}
+
+function BeforeAfterOutput({ data }) {
+  return (
+    <div>
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)", borderLeft: "3px solid #d4af37" }}>
+        <Label>🎯 Hook Line</Label>
+        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.4, fontFamily: "'Space Grotesk',sans-serif" }}>{data.hook}</div>
+      </Card>
+      {data.comparisons?.map((c, i) => (
+        <Card key={i}>
+          <Label>Point {i + 1} — {c.label}</Label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div style={{ background: "#1a0000", border: "1px solid #440000", borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 10, color: "#ff4444", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>BEFORE</div>
+              <div style={{ fontSize: 13, color: "#ffaaaa", lineHeight: 1.5 }}>{c.before}</div>
+            </div>
+            <div style={{ background: "#001a00", border: "1px solid #004400", borderRadius: 12, padding: 14 }}>
+              <div style={{ fontSize: 10, color: "#44ff44", fontWeight: 700, letterSpacing: 1, marginBottom: 6 }}>AFTER AI</div>
+              <div style={{ fontSize: 13, color: "#aaffaa", lineHeight: 1.5 }}>{c.after}</div>
+            </div>
+          </div>
+        </Card>
+      ))}
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)" }}>
+        <Label>📋 Caption</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>{data.caption}</div>
+        <CopyBtn text={data.caption} />
+      </Card>
+      <Card>
+        <Label>🎨 Visual Direction</Label>
+        <div style={{ color: "#aaa", fontSize: 13, lineHeight: 1.6 }}>{data.visualDirection}</div>
+      </Card>
+      <Card>
+        <Label>🏷 Hashtags</Label>
+        <div>{data.hashtags?.map((h, i) => <Tag key={i} text={h} />)}</div>
+      </Card>
+      <Card>
+        <Label>🕐 Best Time to Post</Label>
+        <div style={{ color: "#d4af37", fontSize: 14, fontWeight: 700 }}>{data.postTime}</div>
+      </Card>
+    </div>
+  );
+}
+
+function ToolOfDayOutput({ data }) {
+  return (
+    <div>
+      <Card style={{ background: "linear-gradient(135deg,#0a0a1a,#111)", border: "1px solid #d4af37" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+          <div style={{ fontSize: 22, fontWeight: 900, color: "#d4af37", fontFamily: "'Space Grotesk',sans-serif" }}>{data.toolName}</div>
+          <span style={{ background: "#1a1a00", border: "1px solid #d4af37", color: "#d4af37", fontSize: 11, padding: "4px 10px", borderRadius: 20, fontWeight: 700 }}>{data.pricing}</span>
         </div>
-        {[["1","Go to console.groq.com"],["2","Sign up (free)"],["3","Click API Keys in sidebar"],["4","Create key → copy it"],["5","Paste below"]].map(([n,s])=>(
-          <div key={n} style={{display:"flex",gap:12,alignItems:"center",marginBottom:12}}>
-            <div style={{width:28,height:28,borderRadius:"50%",background:"#0f3460",color:"#fff",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:900,flexShrink:0}}>{n}</div>
-            <div style={{fontSize:14,color:"#334155",fontWeight:600}}>{s}</div>
+        <div style={{ fontSize: 14, color: "#888", fontStyle: "italic", marginBottom: 12 }}>{data.tagline}</div>
+        <div style={{ fontSize: 14, color: "#ddd", lineHeight: 1.6 }}>{data.whatItDoes}</div>
+      </Card>
+      <Card>
+        <Label>👤 Who It's For</Label>
+        <div style={{ color: "#ccc", fontSize: 14, lineHeight: 1.6 }}>{data.whoItsFor}</div>
+      </Card>
+      <Card>
+        <Label>⚡ 3 Killer Features</Label>
+        {data.features?.map((f, i) => (
+          <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", marginBottom: 10 }}>
+            <div style={{ width: 22, height: 22, borderRadius: "50%", background: "#d4af37", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900, flexShrink: 0 }}>{i + 1}</div>
+            <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.5, paddingTop: 2 }}>{f}</div>
           </div>
         ))}
-        <input type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&saveKey()} placeholder="gsk_..." style={{width:"100%",padding:"15px 16px",borderRadius:14,border:"2px solid #e2e8f0",fontSize:15,fontFamily:"monospace",boxSizing:"border-box",outline:"none",color:"#0a2540",background:"#f8fafc",marginTop:20}}/>
-        {error&&<div style={{color:"#e74c3c",fontSize:13,marginTop:8,padding:"8px 12px",background:"#fef2f2",borderRadius:8}}>⚠️ {error}</div>}
-        <button onClick={saveKey} disabled={!keyInput.trim()} style={{width:"100%",marginTop:14,padding:16,borderRadius:14,border:"none",background:keyInput.trim()?"linear-gradient(135deg,#0a2540,#0f3460)":"#e2e8f0",color:keyInput.trim()?"#fff":"#94a3b8",fontSize:16,fontWeight:800,cursor:keyInput.trim()?"pointer":"not-allowed"}}>Save & Continue →</button>
+      </Card>
+      <Card style={{ borderLeft: "3px solid #d4af37" }}>
+        <Label>🇳🇬 Rollyadams Angle</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6 }}>{data.rolladamsAngle}</div>
+      </Card>
+      <Card style={{ background: "#0a1a0a", border: "1px solid #1a4a1a" }}>
+        <Label>🔗 Pair With</Label>
+        <div style={{ fontSize: 15, fontWeight: 700, color: "#4ade80", marginBottom: 6 }}>{data.pairWith?.name}</div>
+        <div style={{ fontSize: 13, color: "#888" }}>{data.pairWith?.reason}</div>
+      </Card>
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)" }}>
+        <Label>📋 Caption</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>{data.caption}</div>
+        <CopyBtn text={data.caption} />
+      </Card>
+      <Card>
+        <Label>🏷 Hashtags</Label>
+        <div>{data.hashtags?.map((h, i) => <Tag key={i} text={h} />)}</div>
+      </Card>
+    </div>
+  );
+}
+
+function SixtySecondsOutput({ data }) {
+  const fullScript = data.shots?.map(s => `[${s.timestamp}]\nSAY: ${s.voiceover}\nON SCREEN: ${s.textOverlay}\nSHOW: ${s.visual}`).join("\n\n");
+  return (
+    <div>
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)", borderLeft: "3px solid #d4af37" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+          <Label>🎬 Script Title</Label>
+          <CopyBtn text={fullScript} />
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", fontFamily: "'Space Grotesk',sans-serif" }}>{data.title}</div>
+      </Card>
+      <Card>
+        <Label>🎵 Audio Vibe</Label>
+        <div style={{ color: "#d4af37", fontSize: 14, fontWeight: 600 }}>{data.audioVibe}</div>
+      </Card>
+      {data.shots?.map((shot, i) => (
+        <Card key={i} style={{ padding: 0, overflow: "hidden" }}>
+          <div style={{ background: "#1a1500", padding: "10px 16px", borderBottom: "1px solid #2a2a2a" }}>
+            <span style={{ fontSize: 12, color: "#d4af37", fontWeight: 800, fontFamily: "monospace" }}>{shot.timestamp}</span>
+          </div>
+          <div style={{ padding: "14px 16px" }}>
+            <div style={{ marginBottom: 12 }}>
+              <Label>🎤 Say</Label>
+              <div style={{ fontSize: 15, color: "#fff", lineHeight: 1.6, fontWeight: 600 }}>{shot.voiceover}</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <Label>📺 On Screen</Label>
+              <div style={{ background: "#000", border: "1px solid #333", borderRadius: 8, padding: "10px 14px", fontSize: 14, color: "#d4af37", fontWeight: 700, fontFamily: "'Space Grotesk',sans-serif" }}>{shot.textOverlay}</div>
+            </div>
+            <div>
+              <Label>🎥 Visual</Label>
+              <div style={{ fontSize: 13, color: "#888", lineHeight: 1.5, fontStyle: "italic" }}>{shot.visual}</div>
+            </div>
+          </div>
+        </Card>
+      ))}
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)" }}>
+        <Label>📋 Caption</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>{data.caption}</div>
+        <CopyBtn text={data.caption} />
+      </Card>
+      <Card>
+        <Label>🏷 Hashtags</Label>
+        <div>{data.hashtags?.map((h, i) => <Tag key={i} text={h} />)}</div>
+      </Card>
+    </div>
+  );
+}
+
+function ThisAICanOutput({ data }) {
+  const sections = [
+    { label: "🔥 HOOK", content: data.hook, overlay: data.textOverlays?.hook, highlight: true },
+    { label: "✅ Proof Points", content: data.proof?.join("\n"), overlay: data.textOverlays?.proof },
+    { label: "😱 The Twist", content: data.twist, overlay: data.textOverlays?.twist },
+    { label: "⚠️ The Stakes", content: data.stakes, overlay: data.textOverlays?.stakes },
+    { label: "🇳🇬 Bridge", content: data.bridge, overlay: data.textOverlays?.bridge },
+    { label: "👉 CTA", content: data.cta },
+  ];
+  return (
+    <div>
+      <Card style={{ background: "#000", border: "2px solid #d4af37", marginBottom: 20 }}>
+        <Label>🖼 Thumbnail Text</Label>
+        <div style={{ fontSize: 20, fontWeight: 900, color: "#d4af37", lineHeight: 1.3, fontFamily: "'Space Grotesk',sans-serif" }}>{data.thumbnailText}</div>
+      </Card>
+      {sections.map((s, i) => (
+        <Card key={i} style={s.highlight ? { borderLeft: "3px solid #d4af37", background: "#0a0a00" } : {}}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <Label>{s.label}</Label>
+            <CopyBtn text={s.content} />
+          </div>
+          <div style={{ fontSize: s.highlight ? 17 : 14, color: s.highlight ? "#fff" : "#ccc", lineHeight: 1.6, fontWeight: s.highlight ? 700 : 400, whiteSpace: "pre-line" }}>{s.content}</div>
+          {s.overlay && (
+            <div style={{ marginTop: 10, background: "#000", border: "1px solid #333", borderRadius: 8, padding: "8px 12px" }}>
+              <div style={{ fontSize: 10, color: "#555", fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>ON SCREEN</div>
+              <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>{s.overlay}</div>
+            </div>
+          )}
+        </Card>
+      ))}
+      <Card style={{ background: "linear-gradient(135deg,#1a1500,#111)" }}>
+        <Label>📋 Caption</Label>
+        <div style={{ color: "#e0e0e0", fontSize: 14, lineHeight: 1.6, marginBottom: 10 }}>{data.caption}</div>
+        <CopyBtn text={data.caption} />
+      </Card>
+      <Card>
+        <Label>🏷 Hashtags</Label>
+        <div>{data.hashtags?.map((h, i) => <Tag key={i} text={h} />)}</div>
+      </Card>
+      <Card>
+        <Label>🕐 Best Time to Post</Label>
+        <div style={{ color: "#d4af37", fontSize: 14, fontWeight: 700 }}>{data.postTime}</div>
+      </Card>
+    </div>
+  );
+}
+
+function renderOutput(formatId, data) {
+  if (!data) return null;
+  const map = { didyouknow: DidYouKnowOutput, beforeafter: BeforeAfterOutput, toolofday: ToolOfDayOutput, "60seconds": SixtySecondsOutput, thisaican: ThisAICanOutput };
+  const Component = map[formatId];
+  return Component ? <Component data={data} /> : null;
+}
+
+// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+export default function App() {
+  const [screen, setScreen] = useState("splash");
+  const [groqKey, setGroqKey] = useState(() => localStorage.getItem(GROQ_KEY_STORAGE) || "");
+  const [keyInput, setKeyInput] = useState("");
+  const [selectedFormat, setSelectedFormat] = useState(null);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [newsItems, setNewsItems] = useState([]);
+  const [selectedNews, setSelectedNews] = useState(null);
+  const [output, setOutput] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadMsg, setLoadMsg] = useState("");
+  const [error, setError] = useState("");
+  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem("rat_history") || "[]"); } catch { return []; } });
+
+  const saveKey = () => {
+    if (!keyInput.trim()) return;
+    localStorage.setItem(GROQ_KEY_STORAGE, keyInput.trim());
+    setGroqKey(keyInput.trim());
+    setError("");
+    setScreen("home");
+  };
+
+  const callGroq = useCallback(async (prompt) => {
+    const key = localStorage.getItem(GROQ_KEY_STORAGE) || groqKey;
+    if (!key) throw new Error("No API key. Please add your Groq key.");
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+      body: JSON.stringify({ model: GROQ_MODEL, max_tokens: 2000, temperature: 0.7, messages: [{ role: "user", content: prompt }] })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
+    const text = data.choices?.[0]?.message?.content || "";
+    const clean = text.replace(/```json|```/g, "").trim();
+    const si = clean.indexOf("{"), ei = clean.lastIndexOf("}") + 1;
+    if (si === -1) throw new Error("Invalid response format");
+    return JSON.parse(clean.slice(si, ei));
+  }, [groqKey]);
+
+  const fetchNews = useCallback(async (topicId) => {
+    const t = TOPICS.find(x => x.id === topicId);
+    setLoading(true); setError(""); setLoadMsg("🔍 Finding viral AI stories...");
+    setSelectedTopic(topicId);
+    try {
+      const result = await callGroq(`You are a viral content researcher. Find 5 shocking, scroll-stopping AI news stories about: "${t.query}".\n\nPick stories that would make someone stop scrolling. Focus on: record-breaking demos, AI replacing human jobs, shocking capabilities, major product launches, controversies, breakthroughs.\n\nMake headlines punchy and specific — never generic. Think: "ChatGPT just destroyed a $200k industry in one update" not "AI advances continue".\n\nReturn ONLY valid JSON array:\n[{"title":"punchy headline","summary":"2 sentences on why this is shocking","source":"Publication","pubDate":"2025"}]\n\nReturn exactly 5 items.`);
+      setNewsItems(Array.isArray(result) ? result : []);
+      setScreen("news");
+    } catch (e) {
+      setError("❌ " + e.message);
+    } finally { setLoading(false); }
+  }, [callGroq]);
+
+  const generateContent = useCallback(async (news) => {
+    setSelectedNews(news);
+    setLoading(true); setError(""); setLoadMsg("✍️ Crafting viral content...");
+    try {
+      const prompt = buildPrompt(selectedFormat, selectedTopic, news);
+      const result = await callGroq(prompt);
+      setOutput(result);
+      const entry = { id: Date.now(), format: selectedFormat, topic: selectedTopic, newsTitle: news.title, output: result, createdAt: new Date().toLocaleString("en-GB") };
+      const updated = [entry, ...history].slice(0, 20);
+      setHistory(updated);
+      localStorage.setItem("rat_history", JSON.stringify(updated));
+      setScreen("output");
+    } catch (e) {
+      setError("❌ " + e.message);
+    } finally { setLoading(false); }
+  }, [selectedFormat, selectedTopic, callGroq, history]);
+
+  const fmt = FORMATS.find(f => f.id === selectedFormat);
+  const topic = TOPICS.find(t => t.id === selectedTopic);
+
+  const S = { fontFamily: "'Space Grotesk', 'Segoe UI', sans-serif" };
+
+  if (screen === "splash") return (
+    <div style={{ minHeight: "100dvh", background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 28px", ...S }}>
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 0%, #1a1400 0%, #000 60%)", pointerEvents: "none" }} />
+      <div style={{ position: "relative", textAlign: "center" }}>
+        <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 5, textTransform: "uppercase", fontWeight: 700, marginBottom: 16 }}>Rollyadams Techworld</div>
+        <h1 style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1, margin: "0 0 8px", letterSpacing: -2 }}>RAT<br /><span style={{ color: "#d4af37" }}>Studio</span></h1>
+        <p style={{ color: "#555", fontSize: 15, margin: "16px 0 48px", lineHeight: 1.6 }}>5 viral content formats.<br />One AI-powered studio.</p>
+        <button onClick={() => setScreen(groqKey ? "home" : "setup")} style={{ background: "#d4af37", border: "none", color: "#000", padding: "16px 48px", borderRadius: 4, fontSize: 16, fontWeight: 900, cursor: "pointer", letterSpacing: 1, textTransform: "uppercase" }}>
+          Launch Studio
+        </button>
+        {history.length > 0 && <button onClick={() => setScreen("history")} style={{ display: "block", margin: "16px auto 0", background: "none", border: "none", color: "#444", fontSize: 13, cursor: "pointer" }}>📁 History ({history.length})</button>}
       </div>
-    </Screen>
+      <div style={{ position: "absolute", bottom: 20, color: "#222", fontSize: 11 }}>v{APP_VERSION}</div>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700;800;900&display=swap');`}</style>
+    </div>
   );
 
-  if(screen==="topicSelect")return(
-    <Screen>
-      {loading&&<LoadingOverlay message={loadMsg}/>}
-      <div style={{padding:"48px 24px 40px"}}>
-        <div style={{marginBottom:28}}>
-          <div style={{fontSize:12,color:"#94a3b8",fontWeight:800,letterSpacing:2,textTransform:"uppercase",marginBottom:6}}>Today's Content</div>
-          <h2 style={{color:"#0a2540",fontSize:26,fontWeight:900}}>Pick a Topic</h2>
-          <p style={{color:"#64748b",fontSize:14,marginTop:4}}>Groq AI finds the latest news for it</p>
+  if (screen === "setup") return (
+    <div style={{ minHeight: "100dvh", background: "#000", padding: "0 24px", ...S }}>
+      <div style={{ paddingTop: 60 }}>
+        <button onClick={() => setScreen("splash")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", marginBottom: 32 }}>←</button>
+        <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 12, textTransform: "uppercase" }}>Step 01</div>
+        <h2 style={{ color: "#fff", fontSize: 28, fontWeight: 900, marginBottom: 8, letterSpacing: -0.5 }}>Connect Groq</h2>
+        <p style={{ color: "#555", fontSize: 14, lineHeight: 1.7, marginBottom: 32 }}>Free at <strong style={{ color: "#d4af37" }}>console.groq.com</strong><br />Sign up → API Keys → Create key</p>
+        {[["1", "Go to console.groq.com"], ["2", "Sign up — completely free"], ["3", "Sidebar → API Keys"], ["4", "Create new key → copy"], ["5", "Paste below"]].map(([n, s]) => (
+          <div key={n} style={{ display: "flex", gap: 14, alignItems: "center", marginBottom: 14 }}>
+            <div style={{ width: 26, height: 26, borderRadius: "50%", background: "#1a1500", border: "1px solid #d4af37", color: "#d4af37", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, flexShrink: 0 }}>{n}</div>
+            <div style={{ fontSize: 14, color: "#888" }}>{s}</div>
+          </div>
+        ))}
+        <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === "Enter" && saveKey()} placeholder="gsk_..." style={{ width: "100%", marginTop: 24, padding: "14px 16px", background: "#0a0a0a", border: "1px solid #333", borderRadius: 4, fontSize: 15, fontFamily: "monospace", color: "#fff", outline: "none", boxSizing: "border-box" }} />
+        {error && <div style={{ color: "#ff4444", fontSize: 13, marginTop: 8, padding: "8px 12px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
+        <button onClick={saveKey} disabled={!keyInput.trim()} style={{ width: "100%", marginTop: 14, padding: "15px", background: keyInput.trim() ? "#d4af37" : "#1a1a1a", border: "none", color: keyInput.trim() ? "#000" : "#444", fontSize: 15, fontWeight: 900, cursor: keyInput.trim() ? "pointer" : "not-allowed", borderRadius: 4, letterSpacing: 1, textTransform: "uppercase" }}>
+          Save & Enter Studio
+        </button>
+      </div>
+    </div>
+  );
+
+  if (screen === "home") return (
+    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
+      {loading && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 999, gap: 20 }}>
+          <div style={{ width: 48, height: 48, border: "3px solid #1a1500", borderTop: "3px solid #d4af37", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <div style={{ color: "#d4af37", fontSize: 15, fontWeight: 700 }}>{loadMsg}</div>
+          <style>{`@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}`}</style>
         </div>
-        {error&&(
-          <div style={{background:"#fef2f2",border:"2px solid #fecaca",borderRadius:12,padding:"14px 16px",marginBottom:20}}>
-            <div style={{color:"#e74c3c",fontSize:14,fontWeight:700,marginBottom:6}}>Error</div>
-            <div style={{color:"#7f1d1d",fontSize:13,lineHeight:1.5}}>{error}</div>
-            <button onClick={()=>{setError("");setScreen("setup");}} style={{marginTop:10,padding:"8px 16px",borderRadius:8,border:"none",background:"#e74c3c",color:"#fff",fontSize:13,fontWeight:700,cursor:"pointer"}}>Re-enter API Key</button>
+      )}
+      <div style={{ padding: "48px 20px 40px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 32 }}>
+          <div>
+            <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>RAT Studio</div>
+            <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 900, letterSpacing: -0.5 }}>Choose Format</h2>
+          </div>
+          <button onClick={() => { setError(""); setScreen("setup"); }} style={{ background: "none", border: "1px solid #222", color: "#555", padding: "6px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer" }}>⚙ Key</button>
+        </div>
+
+        {error && (
+          <div style={{ background: "#1a0000", border: "1px solid #440000", borderRadius: 8, padding: "14px 16px", marginBottom: 20 }}>
+            <div style={{ color: "#ff4444", fontSize: 13, lineHeight: 1.5, marginBottom: 8 }}>{error}</div>
+            <button onClick={() => { setError(""); setScreen("setup"); }} style={{ padding: "6px 14px", background: "#ff4444", border: "none", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Fix API Key</button>
           </div>
         )}
-        <div style={{display:"grid",gap:14}}>
-          {NEWS_TOPICS.map(t=>(
-            <button key={t.id} onClick={()=>fetchNews(t.id)} style={{padding:20,borderRadius:16,border:"2px solid #e8f0fe",background:"#fff",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:16,boxShadow:"0 2px 12px rgba(0,0,0,0.05)"}}>
-              <div style={{width:52,height:52,borderRadius:14,background:`${t.color}18`,border:`2px solid ${t.color}30`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{t.emoji}</div>
-              <div><div style={{fontSize:16,fontWeight:800,color:"#0a2540"}}>{t.label}</div><div style={{fontSize:12,color:"#94a3b8",marginTop:2,fontWeight:600}}>Tap to find latest news</div></div>
-              <div style={{marginLeft:"auto",color:"#cbd5e1",fontSize:18}}>›</div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          {FORMATS.map(f => (
+            <button key={f.id} onClick={() => { setSelectedFormat(f.id); setScreen("topic"); }} style={{ padding: "18px 20px", background: "#0a0a0a", border: selectedFormat === f.id ? "1px solid #d4af37" : "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left", display: "flex", gap: 16, alignItems: "flex-start" }}>
+              <div style={{ fontSize: 24, flexShrink: 0, width: 44, height: 44, background: "#111", border: "1px solid #222", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center" }}>{f.icon}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", marginBottom: 3 }}>{f.label}</div>
+                <div style={{ fontSize: 12, color: "#555" }}>{f.sub}</div>
+              </div>
+              <div style={{ color: "#333", fontSize: 18, paddingTop: 8 }}>›</div>
             </button>
           ))}
         </div>
-        <div style={{display:"flex",gap:10,marginTop:24}}>
-          <button onClick={()=>{setError("");setScreen("setup");}} style={{flex:1,padding:12,borderRadius:12,border:"2px solid #e2e8f0",background:"transparent",color:"#94a3b8",fontSize:13,fontWeight:700,cursor:"pointer"}}>⚙️ API Key</button>
-          {approvedQueue.length>0&&<button onClick={()=>setScreen("queue")} style={{flex:1,padding:12,borderRadius:12,border:"2px solid #e2e8f0",background:"transparent",color:"#0f3460",fontSize:13,fontWeight:700,cursor:"pointer"}}>📋 Queue ({approvedQueue.length})</button>}
-        </div>
-      </div>
-    </Screen>
-  );
 
-  if(screen==="news")return(
-    <Screen>
-      {loading&&<LoadingOverlay message={loadMsg}/>}
-      <TopNav onBack={()=>setScreen("topicSelect")} title={topicObj().label}/>
-      <div style={{padding:"8px 20px 40px"}}>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:20,fontWeight:600}}>Pick a story to build your script</p>
-        {error&&<div style={{color:"#e74c3c",fontSize:13,marginBottom:16,padding:"12px 16px",background:"#fef2f2",borderRadius:12}}>⚠️ {error}</div>}
-        {newsItems.length===0&&!loading?(
-          <div style={{textAlign:"center",paddingTop:60}}>
-            <div style={{fontSize:40,marginBottom:12}}>📭</div>
-            <div style={{color:"#94a3b8",fontWeight:700}}>No stories found</div>
-            <button onClick={()=>setScreen("topicSelect")} style={{marginTop:20,padding:"12px 28px",borderRadius:12,background:"#0f3460",color:"#fff",border:"none",cursor:"pointer",fontWeight:800}}>Try Another Topic</button>
-          </div>
-        ):(
-          <div style={{display:"grid",gap:14}}>
-            {newsItems.map((n,i)=>(
-              <button key={i} onClick={()=>generateScript(n)} style={{padding:18,borderRadius:16,border:"2px solid #e8f0fe",background:"#fff",cursor:"pointer",textAlign:"left",boxShadow:"0 2px 10px rgba(0,0,0,0.05)"}}>
-                <div style={{fontSize:15,fontWeight:800,color:"#0a2540",marginBottom:8,lineHeight:1.45}}>{n.title}</div>
-                {n.summary&&<div style={{fontSize:12,color:"#64748b",lineHeight:1.55,marginBottom:10}}>{n.summary.slice(0,110)}...</div>}
-                <div style={{display:"flex",justifyContent:"space-between"}}>
-                  <div style={{fontSize:11,color:"#94a3b8",fontWeight:700}}>{n.source}</div>
-                  <div style={{fontSize:11,color:"#94a3b8"}}>{n.pubDate}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-        <button onClick={()=>fetchNews(topic)} style={{width:"100%",marginTop:16,padding:13,borderRadius:12,border:"2px solid #e2e8f0",background:"transparent",color:"#0f3460",fontSize:14,fontWeight:800,cursor:"pointer"}}>🔄 Refresh Stories</button>
-      </div>
-    </Screen>
-  );
-
-  if(screen==="script")return(
-    <Screen>
-      {loading&&<LoadingOverlay message={loadMsg}/>}
-      <TopNav onBack={()=>setScreen("news")} title="Review Script"/>
-      <div style={{padding:"8px 20px 120px"}}>
-        <p style={{color:"#64748b",fontSize:13,marginBottom:16,fontWeight:600}}>Edit any line before exporting</p>
-        <div style={{background:"#f0f9ff",border:"2px solid #bae6fd",borderRadius:14,padding:14,marginBottom:20}}>
-          <div style={{fontSize:10,color:"#0284c7",fontWeight:900,letterSpacing:1.5,textTransform:"uppercase",marginBottom:5}}>{topicObj().emoji} Story</div>
-          <div style={{fontSize:13,color:"#0a2540",fontWeight:700,lineHeight:1.5}}>{selectedNews?.title}</div>
-        </div>
-        <div style={{display:"grid",gap:12}}>
-          {script.map((line,i)=>(
-            <div key={i} style={{display:"flex",gap:12,alignItems:"flex-start",background:line.speaker===0?"#f8fafc":"#f0fdf4",border:`2px solid ${line.speaker===0?"#e2e8f0":"#bbf7d0"}`,borderRadius:14,padding:14}}>
-              <div style={{flexShrink:0,marginTop:2}}>{line.speaker===0?<ConfusedGuy speaking={false} size={38}/>:<SmartGuy speaking={false} size={38}/>}</div>
-              <div style={{flex:1}}>
-                <div style={{fontSize:10,fontWeight:900,letterSpacing:1.5,textTransform:"uppercase",marginBottom:6,color:line.speaker===0?"#64748b":"#16a34a"}}>{line.speaker===0?"Guy 1":"Guy 2"}</div>
-                <textarea value={line.line} onChange={e=>{const u=[...script];u[i]={...u[i],line:e.target.value};setScript(u);}} rows={2} style={{width:"100%",border:"none",background:"transparent",fontSize:14,color:"#0a2540",fontFamily:"'Nunito',sans-serif",fontWeight:700,resize:"none",outline:"none",lineHeight:1.55,boxSizing:"border-box"}}/>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:430,background:"#fff",borderTop:"2px solid #e2e8f0",padding:"14px 20px 24px",display:"flex",gap:10,boxSizing:"border-box",boxShadow:"0 -4px 24px rgba(0,0,0,0.08)"}}>
-        <button onClick={()=>generateScript(selectedNews)} style={{flex:1,padding:14,borderRadius:12,border:"2px solid #e2e8f0",background:"#f8fafc",color:"#64748b",fontSize:13,fontWeight:800,cursor:"pointer"}}>🔄 Redo</button>
-        <button onClick={approvePost} style={{flex:1,padding:14,borderRadius:12,border:"2px solid #bbf7d0",background:"#f0fdf4",color:"#16a34a",fontSize:13,fontWeight:800,cursor:"pointer"}}>✅ Approve</button>
-        <button onClick={()=>setScreen("preview")} style={{flex:2,padding:14,borderRadius:12,border:"none",background:"linear-gradient(135deg,#0a2540,#0f3460)",color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer"}}>▶ Preview</button>
-      </div>
-    </Screen>
-  );
-
-  if(screen==="preview")return(
-    <div style={{minHeight:"100dvh",width:"100%",maxWidth:430,margin:"0 auto",background:"#08111e",fontFamily:"'Nunito',sans-serif",position:"relative",display:"flex",flexDirection:"column",overflow:"hidden"}}>
-      <TopNav onBack={()=>{stopPlay();setScreen("script");}} title="Preview" light/>
-      <div style={{flex:1,position:"relative",background:"linear-gradient(180deg,#0d1b2e 0%,#0a2540 55%,#081828 100%)",display:"flex",flexDirection:"column"}}>
-        <div style={{textAlign:"center",paddingTop:14,paddingBottom:6}}>
-          <div style={{fontSize:11,color:"#2ecc71",fontWeight:900,letterSpacing:3,textTransform:"uppercase"}}>Rollyadams Techworld</div>
-        </div>
-        {selectedNews&&(<div style={{margin:"0 16px 12px",background:"rgba(46,204,113,0.1)",border:"1px solid rgba(46,204,113,0.25)",borderRadius:10,padding:"9px 14px",textAlign:"center"}}><div style={{fontSize:12,color:"#4ade80",fontWeight:700,lineHeight:1.4}}>{selectedNews.title?.slice(0,65)}...</div></div>)}
-        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",gap:16,padding:"0 12px",position:"relative"}}>
-          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",flex:1}}>
-            <ConfusedGuy speaking={playing&&currentLine>=0&&script[currentLine]?.speaker===0&&mouthOpen} dim={playing&&currentLine>=0&&script[currentLine]?.speaker===1} size={115}/>
-            <div style={{fontSize:10,color:"#4b6a8a",fontWeight:800,letterSpacing:1,marginTop:6,textTransform:"uppercase"}}>Guy 1</div>
-          </div>
-          <div style={{width:1.5,height:70,background:"linear-gradient(180deg,transparent 0%,#2ecc71 50%,transparent 100%)",opacity:0.4,flexShrink:0}}/>
-          <div style={{position:"relative",display:"flex",flexDirection:"column",alignItems:"center",flex:1}}>
-            <SmartGuy speaking={playing&&currentLine>=0&&script[currentLine]?.speaker===1&&mouthOpen} dim={playing&&currentLine>=0&&script[currentLine]?.speaker===0} size={115}/>
-            <div style={{fontSize:10,color:"#4b6a8a",fontWeight:800,letterSpacing:1,marginTop:6,textTransform:"uppercase"}}>Guy 2</div>
-          </div>
-        </div>
-        <SubtitleBar text={playing&&currentLine>=0?displayLine:""} speaker={playing&&currentLine>=0?script[currentLine]?.speaker:0}/>
-        {playing&&script.length>0&&<ProgressDots total={script.length} current={currentLine}/>}
-      </div>
-      <canvas ref={canvasRef} style={{display:"none"}}/>
-      <div style={{padding:"14px 18px 32px",background:"#08111e"}}>
-        {!playing?(
-          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-            <button onClick={playScript} style={{padding:15,borderRadius:14,border:"none",background:"linear-gradient(135deg,#2ecc71,#1fa355)",color:"#fff",fontSize:15,fontWeight:900,cursor:"pointer"}}>▶ Play</button>
-            <button onClick={exportVideo} style={{padding:15,borderRadius:14,border:"none",background:"linear-gradient(135deg,#e74c3c,#c0392b)",color:"#fff",fontSize:14,fontWeight:900,cursor:"pointer"}}>⬇ Export</button>
-            <button onClick={()=>setScreen("script")} style={{padding:13,borderRadius:12,border:"2px solid #1e3a5f",background:"transparent",color:"#4b6a8a",fontSize:13,fontWeight:800,cursor:"pointer"}}>← Edit</button>
-            <button onClick={approvePost} style={{padding:13,borderRadius:12,border:"2px solid #16a34a",background:"transparent",color:"#2ecc71",fontSize:13,fontWeight:800,cursor:"pointer"}}>✅ Approve</button>
-          </div>
-        ):(
-          <button onClick={stopPlay} style={{width:"100%",padding:16,borderRadius:14,border:"none",background:"#e74c3c",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer"}}>⏹ Stop</button>
+        {history.length > 0 && (
+          <button onClick={() => setScreen("history")} style={{ width: "100%", marginTop: 20, padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: "#555", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>
+            📁 Content History ({history.length})
+          </button>
         )}
       </div>
-      {exporting&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(8,17,30,0.96)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:20,zIndex:999}}>
-          <div style={{display:"flex",gap:16}}>
-            <div style={{animation:"float 2s ease-in-out infinite"}}><ConfusedGuy speaking={false} size={70}/></div>
-            <div style={{animation:"float 2s ease-in-out infinite 1s"}}><SmartGuy speaking={true} size={70}/></div>
-          </div>
-          <div style={{color:"#2ecc71",fontSize:16,fontWeight:800}}>Rendering video...</div>
-          <div style={{width:240,height:8,background:"#1e3a5f",borderRadius:4,overflow:"hidden"}}>
-            <div style={{width:`${exportProgress}%`,height:"100%",background:"linear-gradient(90deg,#2ecc71,#1fa355)",borderRadius:4,transition:"width 0.3s ease"}}/>
-          </div>
-          <div style={{color:"#4b6a8a",fontSize:13,fontWeight:700}}>{exportProgress}%</div>
-          <div style={{color:"#2a4a6a",fontSize:12,textAlign:"center",maxWidth:220}}>Keep screen on & unmute your phone</div>
-        </div>
-      )}
     </div>
   );
 
-  if(screen==="approved")return(
-    <Screen>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100dvh",padding:"0 28px",textAlign:"center"}}>
-        <div style={{fontSize:64,marginBottom:16}}>✅</div>
-        <h2 style={{color:"#0a2540",fontSize:28,fontWeight:900,marginBottom:8}}>Approved!</h2>
-        <p style={{color:"#64748b",fontSize:15,lineHeight:1.7,marginBottom:36}}>Script saved to your queue.<br/>Go to Preview to export the video.</p>
-        <div style={{display:"grid",gap:12,width:"100%"}}>
-          <button onClick={()=>setScreen("preview")} style={{padding:16,borderRadius:14,border:"none",background:"linear-gradient(135deg,#0a2540,#0f3460)",color:"#fff",fontSize:16,fontWeight:900,cursor:"pointer"}}>🎬 Export Video</button>
-          <button onClick={()=>setScreen("queue")} style={{padding:14,borderRadius:14,border:"2px solid #e2e8f0",background:"#f8fafc",color:"#0a2540",fontSize:15,fontWeight:800,cursor:"pointer"}}>📋 View Queue ({approvedQueue.length})</button>
-          <button onClick={()=>{setScreen("topicSelect");setScript([]);setSelectedNews(null);}} style={{padding:14,borderRadius:14,border:"none",background:"transparent",color:"#94a3b8",fontSize:14,fontWeight:700,cursor:"pointer"}}>+ Create Another</button>
+  if (screen === "topic") return (
+    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
+      {loading && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 999, gap: 20 }}>
+          <div style={{ width: 48, height: 48, border: "3px solid #1a1500", borderTop: "3px solid #d4af37", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <div style={{ color: "#d4af37", fontSize: 15, fontWeight: 700 }}>{loadMsg}</div>
         </div>
-      </div>
-    </Screen>
-  );
-
-  if(screen==="done")return(
-    <Screen>
-      <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",minHeight:"100dvh",padding:"0 28px",textAlign:"center"}}>
-        <div style={{fontSize:64,marginBottom:16}}>🎉</div>
-        <h2 style={{color:"#0a2540",fontSize:28,fontWeight:900,marginBottom:8}}>Video Ready!</h2>
-        <p style={{color:"#64748b",fontSize:14,lineHeight:1.7,marginBottom:32}}>Download and post to Instagram Reels or TikTok</p>
-        <div style={{display:"grid",gap:12,width:"100%"}}>
-          {videoURL&&<a href={videoURL} download="rollyadams-reel.webm" style={{display:"block",padding:17,borderRadius:14,background:"linear-gradient(135deg,#2ecc71,#1fa355)",color:"#fff",fontSize:16,fontWeight:900,textDecoration:"none",boxSizing:"border-box",boxShadow:"0 6px 24px rgba(46,204,113,0.35)"}}>⬇ Download Video</a>}
-          <button onClick={()=>setScreen("preview")} style={{padding:14,borderRadius:14,border:"2px solid #e2e8f0",background:"#f8fafc",color:"#0a2540",fontSize:15,fontWeight:800,cursor:"pointer"}}>🔁 Export Again</button>
-          <button onClick={()=>{setScreen("topicSelect");setScript([]);setSelectedNews(null);setVideoURL("");}} style={{padding:14,borderRadius:14,border:"none",background:"transparent",color:"#94a3b8",fontSize:14,fontWeight:700,cursor:"pointer"}}>+ New Post</button>
-        </div>
-        <div style={{marginTop:32,background:"#f0f9ff",border:"2px solid #bae6fd",borderRadius:14,padding:18,width:"100%",textAlign:"left"}}>
-          <div style={{fontSize:12,color:"#0284c7",fontWeight:900,letterSpacing:1,marginBottom:10,textTransform:"uppercase"}}>📱 Posting Tips</div>
-          {["Post 9–11am or 6–8pm WAT for best reach","Add 5–8 hashtags in caption","Pin post to your profile","Share to your story same day"].map((tip,i)=>(<div key={i} style={{fontSize:13,color:"#0a2540",fontWeight:600,marginBottom:6}}>• {tip}</div>))}
-        </div>
-      </div>
-    </Screen>
-  );
-
-  if(screen==="queue")return(
-    <Screen>
-      <TopNav onBack={()=>setScreen("topicSelect")} title={`Queue (${approvedQueue.length})`}/>
-      <div style={{padding:"8px 20px 40px"}}>
-        {approvedQueue.length===0?(
-          <div style={{textAlign:"center",paddingTop:60}}><div style={{fontSize:40,marginBottom:12}}>📭</div><div style={{color:"#94a3b8",fontWeight:700}}>No approved posts yet</div></div>
-        ):(
-          <div style={{display:"grid",gap:14}}>
-            {approvedQueue.map((post,i)=>(
-              <div key={post.id} style={{background:"#fff",border:"2px solid #e2e8f0",borderRadius:16,padding:18,boxShadow:"0 2px 10px rgba(0,0,0,0.04)"}}>
-                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
-                  <span style={{fontSize:13,fontWeight:800,color:"#0f3460"}}>{post.topicEmoji} {post.topic}</span>
-                  <span style={{fontSize:11,color:"#94a3b8"}}>{post.approvedAt}</span>
-                </div>
-                <div style={{fontSize:14,color:"#0a2540",fontWeight:700,marginBottom:10,lineHeight:1.4}}>{post.news?.title?.slice(0,70)}...</div>
-                <div style={{fontSize:12,color:"#64748b",marginBottom:12}}>{post.script?.length} lines</div>
-                <div style={{display:"flex",gap:8}}>
-                  <button onClick={()=>{setScript(post.script);setSelectedNews(post.news);setTopic(NEWS_TOPICS.find(t=>t.label===post.topic)?.id||"general");setScreen("preview");}} style={{flex:1,padding:10,borderRadius:10,border:"none",background:"#0f3460",color:"#fff",fontSize:13,fontWeight:800,cursor:"pointer"}}>▶ Preview & Export</button>
-                  <button onClick={()=>saveQueue(approvedQueue.filter((_,j)=>j!==i))} style={{padding:"10px 14px",borderRadius:10,border:"2px solid #fee2e2",background:"transparent",color:"#e74c3c",fontSize:13,fontWeight:800,cursor:"pointer"}}>🗑</button>
-                </div>
+      )}
+      <div style={{ padding: "48px 20px 40px" }}>
+        <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", marginBottom: 24 }}>←</button>
+        <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{fmt?.icon} {fmt?.label}</div>
+        <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 900, letterSpacing: -0.5, marginBottom: 6 }}>Pick Topic</h2>
+        <p style={{ color: "#555", fontSize: 13, marginBottom: 28 }}>Groq finds the hottest stories for it</p>
+        {error && <div style={{ color: "#ff4444", fontSize: 13, marginBottom: 16, padding: "10px 14px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
+        <div style={{ display: "grid", gap: 10 }}>
+          {TOPICS.map(t => (
+            <button key={t.id} onClick={() => fetchNews(t.id)} style={{ padding: "16px 18px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
+              <span style={{ fontSize: 22 }}>{t.emoji}</span>
+              <div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{t.label}</div>
+                <div style={{ fontSize: 12, color: "#444", marginTop: 2 }}>Tap to find stories</div>
               </div>
-            ))}
+              <div style={{ marginLeft: "auto", color: "#333", fontSize: 16 }}>›</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  if (screen === "news") return (
+    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
+      {loading && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.95)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 999, gap: 20 }}>
+          <div style={{ width: 48, height: 48, border: "3px solid #1a1500", borderTop: "3px solid #d4af37", borderRadius: "50%", animation: "spin 1s linear infinite" }} />
+          <div style={{ color: "#d4af37", fontSize: 15, fontWeight: 700 }}>{loadMsg}</div>
+        </div>
+      )}
+      <div style={{ padding: "48px 20px 40px" }}>
+        <button onClick={() => setScreen("topic")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer", marginBottom: 24 }}>←</button>
+        <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{topic?.emoji} {topic?.label}</div>
+        <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 900, letterSpacing: -0.5, marginBottom: 6 }}>Pick a Story</h2>
+        <p style={{ color: "#555", fontSize: 13, marginBottom: 24 }}>Tap one to generate {fmt?.label} content</p>
+        {error && <div style={{ color: "#ff4444", fontSize: 13, marginBottom: 16, padding: "10px 14px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
+        <div style={{ display: "grid", gap: 12 }}>
+          {newsItems.map((n, i) => (
+            <button key={i} onClick={() => generateContent(n)} style={{ padding: "18px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left" }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 8, lineHeight: 1.4 }}>{n.title}</div>
+              {n.summary && <div style={{ fontSize: 12, color: "#555", lineHeight: 1.5, marginBottom: 10 }}>{n.summary.slice(0, 100)}...</div>}
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ fontSize: 11, color: "#d4af37" }}>{n.source}</span>
+                <span style={{ fontSize: 11, color: "#333" }}>{n.pubDate}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+        <button onClick={() => fetchNews(selectedTopic)} style={{ width: "100%", marginTop: 14, padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: "#555", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>🔄 Refresh Stories</button>
+      </div>
+    </div>
+  );
+
+  if (screen === "output") return (
+    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
+      <div style={{ padding: "48px 20px 60px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <button onClick={() => setScreen("news")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+          <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>{fmt?.icon} {fmt?.label}</div>
+          <button onClick={() => { setSelectedFormat(null); setSelectedTopic(null); setOutput(null); setScreen("home"); }} style={{ background: "none", border: "1px solid #222", color: "#555", padding: "6px 10px", borderRadius: 4, fontSize: 12, cursor: "pointer" }}>+ New</button>
+        </div>
+        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: "#444", marginBottom: 4 }}>STORY</div>
+          <div style={{ fontSize: 13, color: "#888", lineHeight: 1.4 }}>{selectedNews?.title}</div>
+        </div>
+        {renderOutput(selectedFormat, output)}
+        <button onClick={() => generateContent(selectedNews)} style={{ width: "100%", marginTop: 8, padding: "14px", background: "transparent", border: "1px solid #d4af37", color: "#d4af37", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>🔄 Regenerate</button>
+        <button onClick={() => setScreen("news")} style={{ width: "100%", marginTop: 10, padding: "14px", background: "transparent", border: "1px solid #1a1a1a", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>← Pick Different Story</button>
+      </div>
+    </div>
+  );
+
+  if (screen === "history") return (
+    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
+      <div style={{ padding: "48px 20px 40px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 28 }}>
+          <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+          <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>History</h2>
+        </div>
+        {history.length === 0 ? (
+          <div style={{ textAlign: "center", paddingTop: 60, color: "#333" }}>No content yet</div>
+        ) : (
+          <div style={{ display: "grid", gap: 12 }}>
+            {history.map((item) => {
+              const f = FORMATS.find(f => f.id === item.format);
+              return (
+                <button key={item.id} onClick={() => { setSelectedFormat(item.format); setSelectedTopic(item.topic); setSelectedNews({ title: item.newsTitle }); setOutput(item.output); setScreen("output"); }} style={{ padding: "16px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>{f?.icon} {f?.label}</span>
+                    <span style={{ fontSize: 11, color: "#333" }}>{item.createdAt}</span>
+                  </div>
+                  <div style={{ fontSize: 13, color: "#888", lineHeight: 1.4 }}>{item.newsTitle}</div>
+                </button>
+              );
+            })}
           </div>
         )}
+        <button onClick={() => { setHistory([]); localStorage.removeItem("rat_history"); }} style={{ width: "100%", marginTop: 20, padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: "#333", fontSize: 13, cursor: "pointer", borderRadius: 4 }}>🗑 Clear History</button>
       </div>
-    </Screen>
+    </div>
   );
 
   return null;
