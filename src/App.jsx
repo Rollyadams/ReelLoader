@@ -362,7 +362,7 @@ export default function App() {
       body: JSON.stringify({
         model: GROQ_MODEL, max_tokens: 2000, temperature: 0.7,
         messages: [
-          { role: "system", content: "You are a JSON API. You ONLY return valid JSON. No markdown, no backticks, no explanation, no preamble. Just raw JSON." },
+          { role: "system", content: "You are a JSON API with knowledge up to early 2026. You ONLY return valid JSON — no markdown, no backticks, no explanation, no preamble. Just raw JSON. When asked for news, always use the most recent events you know about from 2025-2026." },
           { role: "user", content: prompt }
         ]
       })
@@ -396,7 +396,17 @@ export default function App() {
     setSelectedTopic(topicId);
     try {
       const result = await callGroq(
-        `Find 5 shocking AI news stories about the topic: ${t.query}. Make headlines punchy and specific. Return a JSON array of exactly 5 objects: [{"title":"headline","summary":"2 sentences","source":"Publication","pubDate":"2025"}]`,
+        `The current date is May 2026. Find 5 of the most shocking, viral-worthy AI news stories from 2025-2026 related to: ${t.query}.
+
+Critical rules:
+- Stories must be from late 2024, 2025, or 2026 — nothing older
+- Name REAL companies, REAL products, REAL events (OpenAI, Anthropic, Google DeepMind, Meta AI, etc)
+- Headlines must be punchy and specific — never vague
+- Each summary must explain WHY this is shocking or important
+- Vary the stories — no repetition of the same theme
+
+Return a JSON array of exactly 5 objects:
+[{"title":"specific punchy headline","summary":"2 shocking sentences","source":"Real publication name","pubDate":"Month Year"}]`,
         true
       );
       setNewsItems(Array.isArray(result) ? result : []);
