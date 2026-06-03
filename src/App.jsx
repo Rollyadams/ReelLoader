@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from "react";
 
-const GROQ_KEY_STORAGE = "rat_edu_key_v1";
+const GROQ_KEY_STORAGE = "reelloader_key_v1";
 const APP_VERSION = "3.0.0";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
@@ -275,7 +275,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loadMsg, setLoadMsg] = useState("");
   const [error, setError] = useState("");
-  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem("rat_edu_history") || "[]"); } catch { return []; } });
+  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem("reelloader_history") || "[]"); } catch { return []; } });
 
   const cat = CATEGORIES.find(c => c.id === selCategory);
 
@@ -306,7 +306,7 @@ export default function App() {
       const entry = { id: Date.now(), category: selCategory, format: selFormat, topic, videoOutput: vid, cardsOutput: cards, createdAt: new Date().toLocaleString("en-GB") };
       const updated = [entry, ...history].slice(0, 30);
       setHistory(updated);
-      localStorage.setItem("rat_edu_history", JSON.stringify(updated));
+      localStorage.setItem("reelloader_history", JSON.stringify(updated));
       setScreen("output");
     } catch (e) {
       setError("❌ " + e.message);
@@ -321,8 +321,8 @@ export default function App() {
       <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 20%, #140f00 0%, #000 65%)", pointerEvents: "none" }} />
       <div style={{ position: "relative", textAlign: "center", width: "100%" }}>
         <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 5, fontWeight: 700, marginBottom: 16, textTransform: "uppercase" }}>Rollyadams Techworld</div>
-        <h1 style={{ fontSize: 48, fontWeight: 900, color: "#fff", lineHeight: 1, margin: "0 0 6px", letterSpacing: -2 }}>RAT<br /><span style={{ color: "#d4af37" }}>Studio</span></h1>
-        <div style={{ fontSize: 12, color: "#333", letterSpacing: 3, marginBottom: 12, textTransform: "uppercase" }}>Educator Edition</div>
+        <h1 style={{ fontSize: 48, fontWeight: 900, color: "#fff", lineHeight: 1, margin: "0 0 6px", letterSpacing: -2 }}>Reel<span style={{ color: "#d4af37" }}>Loader</span></h1>
+        <div style={{ fontSize: 12, color: "#333", letterSpacing: 3, marginBottom: 12, textTransform: "uppercase" }}>Educator Edition — by Rollyadams Techworld</div>
         <p style={{ color: "#444", fontSize: 14, margin: "0 0 48px", lineHeight: 1.7 }}>
           Pick a topic. Get a professional<br />explainer script + shareable cards.
         </p>
@@ -373,7 +373,7 @@ export default function App() {
       <div style={{ padding: "48px 20px 40px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
           <div>
-            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>RAT Studio</div>
+            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>ReelLoader</div>
             <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, letterSpacing: -0.5 }}>Pick a Category</h2>
           </div>
           <button onClick={() => { setError(""); setScreen("setup"); }} style={{ background: "none", border: "1px solid #1a1a1a", color: "#444", padding: "6px 12px", borderRadius: 4, fontSize: 11, cursor: "pointer" }}>⚙ Key</button>
@@ -531,7 +531,7 @@ export default function App() {
           })}
         </div>
       )}
-      <button onClick={() => { setHistory([]); localStorage.removeItem("rat_edu_history"); }} style={{ width: "100%", marginTop: 16, padding: "11px", background: "transparent", border: "1px solid #1a1a1a", color: "#2a2a2a", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>🗑 Clear History</button>
+      <button onClick={() => { setHistory([]); localStorage.removeItem("reelloader_history"); }} style={{ width: "100%", marginTop: 16, padding: "11px", background: "transparent", border: "1px solid #1a1a1a", color: "#2a2a2a", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>🗑 Clear History</button>
     </div>
   );
 
