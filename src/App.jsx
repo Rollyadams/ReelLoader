@@ -63,7 +63,7 @@ async function callGroq(prompt, isArray = false) {
     body: JSON.stringify({
       model: GROQ_MODEL, max_tokens: 2500, temperature: 0.6,
       messages: [
-        { role: "system", content: "You are a JSON API. Return ONLY raw valid JSON — absolutely no markdown, no backticks, no prose, no explanation before or after. Just the JSON object or array." },
+        { role: "system", content: "You are a JSON API. Return ONLY raw valid JSON. CRITICAL: Inside JSON string values, never use markdown — no asterisks, no **bold**, no *italic*, no #headers, no bullet points. Plain text only inside all string values. No backticks, no code blocks, no explanation outside the JSON." },
         { role: "user", content: prompt }
       ]
     })
@@ -75,8 +75,17 @@ async function callGroq(prompt, isArray = false) {
   const close = isArray ? "]" : "}";
   const si = text.indexOf(open), ei = text.lastIndexOf(close) + 1;
   if (si === -1) throw new Error("Response was not valid JSON. Please try again.");
-  try { return JSON.parse(text.slice(si, ei)); }
-  catch { return JSON.parse(text.slice(si, ei).replace(/,\s*([}\]])/g, "$1").replace(/[\u0000-\u001F]/g, " ")); }
+  const jsonSlice = text.slice(si, ei);
+  try { return JSON.parse(jsonSlice); }
+  catch {
+    // Strip markdown bold/italic asterisks and fix common JSON issues
+    const fixed = jsonSlice
+      .replace(/\*\*(.*?)\*\*/g, "$1")
+      .replace(/\*(.*?)\*/g, "$1")
+      .replace(/,\s*([}\]])/g, "$1")
+      .replace(/[\u0000-\u001F]/g, " ");
+    return JSON.parse(fixed);
+  }
 }
 
 // ─── UI COMPONENTS ────────────────────────────────────────────────────────────
@@ -349,6 +358,8 @@ function buildVideoPrompt(topic, category) {
 
 This is for Rollyadams Techworld — a Nigerian tech company (Solar/Inverter, CCTV Security, Web/App Development). The audience is Nigerian business owners and tech-curious professionals.
 
+IMPORTANT: All JSON string values must be plain text only — no **bold**, no *italic*, no markdown, no asterisks.
+
 Style: Like a high-quality YouTube explainer — clear, precise, no filler, no hype. Build understanding from scratch. Use simple analogies. Every second earns its place.
 
 Structure your script with these timestamps:
@@ -378,6 +389,8 @@ function buildCardsPrompt(topic, category) {
   return `You are creating viral Instagram text cards about: "${topic}" (${category}) for Rollyadams Techworld Nigeria.
 
 STRICT RULES — Cards must be GLANCEABLE. Read in 3 seconds. Understood instantly.
+- NEVER use markdown inside text values (no **bold**, no *italic*, no asterisks)
+- Plain text only in all fields
 - Hook card: max 10 words. A question or shocking statement.
 - Each card body: MAX 15 WORDS. Count them. Cut anything extra.
 - Use analogy, metaphor, or contrast — never definitions
