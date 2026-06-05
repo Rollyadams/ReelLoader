@@ -230,36 +230,42 @@ Return ONLY this JSON object:
 }
 
 function buildCardsPrompt(topic, category) {
-  return `You are an expert educator creating a professional text card series about: "${topic}" for the category: ${category}.
+  return `You are creating viral Instagram text cards about: "${topic}" (${category}) for Rollyadams Techworld Nigeria.
 
-This is for Rollyadams Techworld — a Nigerian tech company (Solar/Inverter, CCTV Security, Web/App Development). The audience is Nigerian business owners and tech-curious professionals.
+STRICT RULES — Cards must be GLANCEABLE. Read in 3 seconds. Understood instantly.
+- Hook card: max 10 words. A question or shocking statement.
+- Each card body: MAX 15 WORDS. Count them. Cut anything extra.
+- Use analogy, metaphor, or contrast — never definitions
+- One idea per card. One.
+- Write like explaining to a smart teenager
 
-Style: Clean, authoritative, educational. Like the best explainer threads on Twitter/X. Each card teaches one clear point. No hype. No filler.
+EXAMPLES OF GOOD vs BAD:
+BAD body: "An API is an interface that enables software systems to communicate using protocols."
+GOOD body: "The waiter between your app and the kitchen. You order. It delivers."
 
-Create:
-- A hook card: one question or shocking fact that makes people want to read all cards
-- 5 teaching cards: each with a short headline and 2-3 sentence explanation
-- A CTA card: what to do next, naturally mentioning Rollyadams Techworld
-- Visual style: how to design these cards (colors, fonts, layout)
+BAD body: "Webhooks use event-driven architecture to push data in real time."
+GOOD body: "Stop asking. Let it tell you when it is ready. That is a webhook."
 
-The cards should build on each other — by card 5, someone should fully understand the topic.
+BAD body: "Solar panels convert photons into electrical energy through the photovoltaic effect."
+GOOD body: "Sunlight hits. Electrons move. Free electricity. That simple."
 
-Return ONLY this JSON object:
+Return ONLY this JSON:
 {
-  "hookCard": "one punchy question or fact",
+  "hookCard": "max 10 word hook question or fact",
   "cards": [
-    {"headline": "Card headline", "body": "2-3 sentence explanation"},
-    {"headline": "Card headline", "body": "2-3 sentence explanation"},
-    {"headline": "Card headline", "body": "2-3 sentence explanation"},
-    {"headline": "Card headline", "body": "2-3 sentence explanation"},
-    {"headline": "Card headline", "body": "2-3 sentence explanation"}
+    {"headline": "2-4 word title", "body": "Max 15 words using analogy or contrast"},
+    {"headline": "2-4 word title", "body": "Max 15 words using analogy or contrast"},
+    {"headline": "2-4 word title", "body": "Max 15 words using analogy or contrast"},
+    {"headline": "2-4 word title", "body": "Max 15 words using analogy or contrast"},
+    {"headline": "2-4 word title", "body": "Max 15 words using analogy or contrast"}
   ],
-  "ctaCard": "CTA text mentioning Rollyadams Techworld naturally",
-  "visualStyle": "design direction for the cards",
-  "caption": "Instagram/TikTok caption under 200 chars",
-  "hashtags": ["#tag1", "#tag2", "#tag3", "#tag4", "#tag5", "#tag6", "#tag7", "#tag8"]
+  "ctaCard": "Short punchy close. Mention Rollyadams Techworld. Max 20 words.",
+  "visualStyle": "Black background. Gold headline. White body text. Clean minimal layout.",
+  "caption": "Caption under 150 chars with 1-2 key emojis",
+  "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]
 }`;
 }
+
 
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
