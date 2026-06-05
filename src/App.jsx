@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
 
 const GROQ_KEY_STORAGE = "reelloader_key_v1";
-const APP_VERSION = "3.0.0";
+const APP_VERSION = "3.1.0";
 const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 const CATEGORIES = [
@@ -168,23 +168,163 @@ function VideoScriptOutput({ data }) {
 }
 
 // ─── CARDS OUTPUT ─────────────────────────────────────────────────────────────
-function CardsOutput({ data }) {
+// ─── SINGLE CARD RENDERER (full screen, screenshot-ready) ────────────────────
+function CardSlide({ type, headline, body, cardNum, total, topic, isHook, isCta }) {
+  return (
+    <div style={{
+      width: "100%",
+      aspectRatio: "1/1",
+      background: "#000",
+      borderRadius: 16,
+      display: "flex",
+      flexDirection: "column",
+      justifyContent: "space-between",
+      padding: "32px 28px",
+      boxSizing: "border-box",
+      position: "relative",
+      overflow: "hidden",
+      border: "1px solid #1a1a1a",
+    }}>
+      {/* Background accent */}
+      <div style={{ position: "absolute", top: -60, right: -60, width: 200, height: 200, borderRadius: "50%", background: "radial-gradient(circle, #d4af3715 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: -40, left: -40, width: 150, height: 150, borderRadius: "50%", background: "radial-gradient(circle, #d4af3708 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      {/* Top bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", fontFamily: "'Space Grotesk',sans-serif" }}>
+          {isHook ? "ReelLoader" : isCta ? "ReelLoader" : `${cardNum} / ${total}`}
+        </div>
+        <div style={{ fontSize: 10, color: "#2a2a2a", fontWeight: 600, letterSpacing: 2, textTransform: "uppercase" }}>
+          {isHook ? "●●●●●" : isCta ? "rollyadams" : "●".repeat(cardNum) + "○".repeat(total - cardNum)}
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "20px 0" }}>
+        {isHook ? (
+          <div>
+            <div style={{ fontSize: 11, color: "#555", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", marginBottom: 16, fontFamily: "'Space Grotesk',sans-serif" }}>Did you know?</div>
+            <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", lineHeight: 1.25, fontFamily: "'Space Grotesk',sans-serif" }}>{headline}</div>
+          </div>
+        ) : isCta ? (
+          <div>
+            <div style={{ width: 40, height: 3, background: "#d4af37", borderRadius: 2, marginBottom: 20 }} />
+            <div style={{ fontSize: 22, fontWeight: 900, color: "#fff", lineHeight: 1.3, marginBottom: 16, fontFamily: "'Space Grotesk',sans-serif" }}>{headline}</div>
+            <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>{body}</div>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 14, fontFamily: "'Space Grotesk',sans-serif" }}>{headline}</div>
+            <div style={{ width: 32, height: 2, background: "#d4af37", borderRadius: 1, marginBottom: 20, opacity: 0.4 }} />
+            <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", lineHeight: 1.35, fontFamily: "'Space Grotesk',sans-serif" }}>{body}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 10, color: "#333", fontWeight: 600, letterSpacing: 1 }}>rollyadamstechworld.com.ng</div>
+        <div style={{ fontSize: 10, color: "#333", fontWeight: 600, letterSpacing: 1 }}>@rollyadamstechworld</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CARDS VIEWER (swipeable full-screen cards) ───────────────────────────────
+function CardsViewer({ data, topic, onClose }) {
+  const allCards = [
+    { type: "hook", headline: data.hookCard, body: "", isHook: true },
+    ...(data.cards || []).map((c, i) => ({ type: "card", headline: c.headline, body: c.body, cardNum: i + 1, total: data.cards.length })),
+    { type: "cta", headline: data.ctaCard, body: data.caption, isCta: true },
+  ];
+  const [idx, setIdx] = useState(0);
+  const touchStartX = useRef(null);
+
+  const handleTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchStartX.current === null) return;
+    const diff = touchStartX.current - e.changedTouches[0].clientX;
+    if (diff > 50 && idx < allCards.length - 1) setIdx(i => i + 1);
+    if (diff < -50 && idx > 0) setIdx(i => i - 1);
+    touchStartX.current = null;
+  };
+
+  const card = allCards[idx];
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #111" }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700, letterSpacing: 2 }}>{idx + 1} / {allCards.length}</div>
+        <div style={{ fontSize: 11, color: "#333" }}>Screenshot to save</div>
+      </div>
+
+      {/* Card */}
+      <div
+        style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", userSelect: "none" }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div style={{ width: "100%", maxWidth: 380 }}>
+          <CardSlide
+            type={card.type}
+            headline={card.headline}
+            body={card.body}
+            cardNum={card.cardNum}
+            total={card.total}
+            topic={topic}
+            isHook={card.isHook}
+            isCta={card.isCta}
+          />
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div style={{ padding: "12px 20px 32px" }}>
+        {/* Progress dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 6, marginBottom: 16 }}>
+          {allCards.map((_, i) => (
+            <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />
+          ))}
+        </div>
+        {/* Prev / Next */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0} style={{ padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 14, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
+          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1} style={{ padding: "12px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 14, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
+        </div>
+        <div style={{ textAlign: "center", marginTop: 12, fontSize: 11, color: "#2a2a2a" }}>Swipe left/right or tap arrows</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── CARDS OUTPUT (list view + preview button) ────────────────────────────────
+function CardsOutput({ data, topic }) {
+  const [showViewer, setShowViewer] = useState(false);
+
+  if (showViewer) return <CardsViewer data={data} topic={topic} onClose={() => setShowViewer(false)} />;
+
   return (
     <div>
+      {/* Preview button — prominent */}
+      <button onClick={() => setShowViewer(true)} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16, letterSpacing: 0.5 }}>
+        📱 Preview Cards (Screenshot to Post)
+      </button>
+
       <Block label="🎯 Hook Card" copyText={data.hookCard} style={{ borderLeft: "3px solid #d4af37" }}>
-        <div style={{ fontSize: 18, fontWeight: 900, color: "#fff", lineHeight: 1.35 }}>{data.hookCard}</div>
+        <div style={{ fontSize: 16, fontWeight: 900, color: "#fff", lineHeight: 1.35 }}>{data.hookCard}</div>
       </Block>
       {data.cards?.map((card, i) => (
-        <Block key={i} label={`Card ${i + 1} of ${data.cards.length}`} copyText={`${card.headline}\n\n${card.body}`}>
-          <div style={{ fontSize: 15, fontWeight: 800, color: "#d4af37", marginBottom: 8, lineHeight: 1.3 }}>{card.headline}</div>
-          <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.65 }}>{card.body}</div>
+        <Block key={i} label={`Card ${i + 1}`} copyText={`${card.headline}
+
+${card.body}`}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: "#d4af37", marginBottom: 6 }}>{card.headline}</div>
+          <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.5 }}>{card.body}</div>
         </Block>
       ))}
       <Block label="🔚 CTA Card" copyText={data.ctaCard} style={{ borderLeft: "3px solid #d4af37" }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff", lineHeight: 1.5 }}>{data.ctaCard}</div>
-      </Block>
-      <Block label="🎨 Visual Style">
-        <div style={{ fontSize: 13, color: "#888", lineHeight: 1.6 }}>{data.visualStyle}</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{data.ctaCard}</div>
       </Block>
       <Block label="📋 Caption" copyText={data.caption}>
         <div style={{ fontSize: 13, color: "#ccc", lineHeight: 1.6 }}>{data.caption}</div>
@@ -194,6 +334,11 @@ function CardsOutput({ data }) {
           {data.hashtags?.map((h, i) => <span key={i} style={{ background: "#111", border: "1px solid #222", color: "#d4af37", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>)}
         </div>
       </Block>
+
+      {/* Preview button at bottom too */}
+      <button onClick={() => setShowViewer(true)} style={{ width: "100%", marginTop: 8, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>
+        📱 Preview Cards
+      </button>
     </div>
   );
 }
@@ -495,13 +640,13 @@ export default function App() {
                   </button>
                 ))}
               </div>
-              {tab === "video" ? <VideoScriptOutput data={videoOutput} /> : <CardsOutput data={cardsOutput} />}
+              {tab === "video" ? <VideoScriptOutput data={videoOutput} /> : <CardsOutput data={cardsOutput} topic={selTopic} />}
             </div>
           );
         })()}
 
         {selFormat === "video" && videoOutput && <VideoScriptOutput data={videoOutput} />}
-        {selFormat === "cards" && cardsOutput && <CardsOutput data={cardsOutput} />}
+        {selFormat === "cards" && cardsOutput && <CardsOutput data={cardsOutput} topic={selTopic} />}
 
         <button onClick={() => generate(selTopic)} style={{ width: "100%", marginTop: 8, padding: "13px", background: "transparent", border: "1px solid #d4af37", color: "#d4af37", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>🔄 Regenerate</button>
         <button onClick={() => setScreen("topic")} style={{ width: "100%", marginTop: 8, padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: "#444", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>← Different Topic</button>
