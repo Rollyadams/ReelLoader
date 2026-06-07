@@ -53,13 +53,13 @@ RULES — plain text only, no markdown, no asterisks:
 - Hook card: shocking question or fact, max 10 words
 - Each card body: MAX 15 WORDS using analogy or contrast, never a definition
 - Headlines: 2-4 words
-- CTA: mentions Rollyadams Techworld, max 20 words
+- CTA: simple warm engagement ask — like, share, follow. No brand mention. Max 15 words.
 
 GOOD body example: "The waiter between your app and the kitchen. You order. It delivers."
 BAD body example: "An API is an interface that enables software systems to communicate."
 
 Return ONLY this JSON:
-{"hookCard":"max 10 word hook","cards":[{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"}],"ctaCard":"short CTA with Rollyadams Techworld","caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
+{"hookCard":"max 10 word hook","cards":[{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"}],"ctaCard":"simple engagement CTA like: If you found this helpful, like and share. Max 15 words.","caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
 }
 
 function videoPrompt(topic, catLabel, style) {
@@ -79,7 +79,7 @@ Shot 2: Why it matters to the viewer
 Shot 3: Core concept explained simply
 Shot 4: Real-world example
 Shot 5: Key insight or takeaway
-Shot 6: Rollyadams Techworld close — natural not forced
+Shot 6: Simple engagement close — encourage likes, shares, follows. Warm and genuine.
 
 Return ONLY this JSON:
 {"title":"plain video title","audioVibe":"music description","keyTakeaway":"one sentence","shots":[{"timestamp":"00:00-00:10","textOverlay":"2-5 bold words for screen","voiceover":"what to say out loud","visual":"what to show or animate"},{"timestamp":"00:10-00:20","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:20-00:30","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:30-00:40","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:40-00:50","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:50-01:00","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"}],"caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
@@ -207,9 +207,16 @@ function VideoAnimator({ data, style, onClose }) {
   const speak = (text, onEnd) => {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(clean(text));
-    utt.rate = 0.92; utt.pitch = 1; utt.volume = 1;
+    utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
     const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(v => v.lang.startsWith("en")) || voices[0];
+    // Prefer deeper male voice — closest to Nigerian English tone
+    const v = voices.find(v => v.name.includes("David") && v.lang.startsWith("en"))
+      || voices.find(v => v.name.includes("James") && v.lang.startsWith("en"))
+      || voices.find(v => v.name.includes("Daniel") && v.lang.startsWith("en"))
+      || voices.find(v => v.name.includes("Male") && v.lang.startsWith("en"))
+      || voices.find(v => v.lang === "en-GB")
+      || voices.find(v => v.lang.startsWith("en"))
+      || voices[0];
     if (v) utt.voice = v;
     utt.onend = onEnd; utt.onerror = onEnd;
     window.speechSynthesis.speak(utt);
@@ -308,9 +315,15 @@ function VideoAnimator({ data, style, onClose }) {
       }, 300);
       await new Promise(resolve => {
         const utt = new SpeechSynthesisUtterance(clean(shots[i].voiceover));
-        utt.rate = 0.92; utt.volume = 1;
+        utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
         const voices = window.speechSynthesis.getVoices();
-        const v = voices.find(v => v.lang.startsWith("en")) || voices[0];
+        const v = voices.find(v => v.name.includes("David") && v.lang.startsWith("en"))
+          || voices.find(v => v.name.includes("James") && v.lang.startsWith("en"))
+          || voices.find(v => v.name.includes("Daniel") && v.lang.startsWith("en"))
+          || voices.find(v => v.name.includes("Male") && v.lang.startsWith("en"))
+          || voices.find(v => v.lang === "en-GB")
+          || voices.find(v => v.lang.startsWith("en"))
+          || voices[0];
         if (v) utt.voice = v;
         utt.onend = () => { stopBlink(); setTimeout(resolve, 300); };
         utt.onerror = () => { stopBlink(); resolve(); };
