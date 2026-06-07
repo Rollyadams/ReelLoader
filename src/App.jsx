@@ -5,6 +5,34 @@ const HISTORY_STORAGE = "reelloader_history_v4";
 const APP_VERSION = "4.0.0";
 const MODEL = "llama-3.3-70b-versatile";
 
+const CTA_OPTIONS = [
+  "Save this for later.",
+  "Share with someone who needs this.",
+  "What do you think? Comment below.",
+  "Follow for more tips.",
+  "Tag a friend who should see this.",
+  "Did you learn something new?",
+  "Double-tap if this was helpful.",
+  "Which tip will you try first?",
+  "Drop your questions in the comments.",
+  "Bookmark this post for future reference.",
+  "Agree or disagree? Let us know.",
+  "Send this to your team.",
+  "Want more content like this? Follow us.",
+  "Share your experience below.",
+  "Stay tuned for Part 2.",
+  "What is your biggest challenge with this?",
+  "Rate this tip from 1 to 10.",
+  "Have you tried this before?",
+  "Tell us your thoughts below.",
+  "What is one thing you would add?",
+  "Learn more via the link in bio.",
+  "Join our community today.",
+  "Drop a comment and I will help you.",
+  "Get started now.",
+  "Sign up for updates.",
+];
+
 const clean = (s) => (s || "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/#{1,6}\s/g, "").trim();
 
 const CATEGORIES = [
@@ -157,11 +185,21 @@ function CardSlide({ headline, body, num, total, isHook, isCta, topic }) {
 // ─── CARDS VIEWER ─────────────────────────────────────────────────────────────
 function CardsViewer({ data, topic, onClose }) {
   const [idx, setIdx] = useState(0);
+  const [editing, setEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    hookCard: data.hookCard,
+    cards: data.cards ? [...data.cards.map(c => ({...c}))] : [],
+    ctaCard: data.ctaCard,
+    caption: data.caption,
+    hashtags: data.hashtags,
+  });
+  const [showCtaPicker, setShowCtaPicker] = useState(false);
   const touchX = useRef(null);
+
   const allCards = [
-    { isHook: true, headline: data.hookCard },
-    ...(data.cards || []).map((c, i) => ({ headline: c.headline, body: c.body, num: i + 1, total: data.cards.length })),
-    { isCta: true, headline: data.ctaCard },
+    { isHook: true, headline: editData.hookCard },
+    ...(editData.cards || []).map((c, i) => ({ headline: c.headline, body: c.body, num: i + 1, total: editData.cards.length })),
+    { isCta: true, headline: editData.ctaCard },
   ];
   const onTouchStart = e => { touchX.current = e.touches[0].clientX; };
   const onTouchEnd = e => {
@@ -184,18 +222,83 @@ function CardsViewer({ data, topic, onClose }) {
           <CardSlide {...c} topic={topic} />
         </div>
       </div>
-      <div style={{ padding: "10px 20px 32px" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 14 }}>
+      {/* CTA Picker Modal */}
+      {showCtaPicker && (
+        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 10, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
+            <button onClick={() => setShowCtaPicker(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+            {CTA_OPTIONS.map((cta, i) => (
+              <button key={i} onClick={() => { setEditData(d => ({...d, ctaCard: cta})); setShowCtaPicker(false); setIdx(allCards.length - 1); }}
+                style={{ width: "100%", padding: "13px 14px", background: editData.ctaCard === cta ? "#1a1400" : "#0a0a0a", border: `1px solid ${editData.ctaCard === cta ? "#d4af37" : "#1a1a1a"}`, borderRadius: 8, color: editData.ctaCard === cta ? "#d4af37" : "#888", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", marginBottom: 8, fontFamily: "inherit" }}>
+                {cta}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editing && (
+        <div style={{ position: "absolute", inset: 0, background: "#000", zIndex: 10, display: "flex", flexDirection: "column" }}>
+          <div style={{ padding: "14px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+            <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>Edit Card {idx + 1}</div>
+            <button onClick={() => setEditing(false)} style={{ padding: "6px 14px", background: "#d4af37", border: "none", color: "#000", fontSize: 12, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done</button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
+            {idx === 0 && (
+              <div>
+                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HOOK CARD</div>
+                <textarea value={editData.hookCard} onChange={e => setEditData(d => ({...d, hookCard: e.target.value}))}
+                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={4} />
+              </div>
+            )}
+            {idx > 0 && idx < allCards.length - 1 && (
+              <div>
+                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HEADLINE</div>
+                <textarea value={editData.cards[idx-1]?.headline || ""} onChange={e => { const c = [...editData.cards]; c[idx-1] = {...c[idx-1], headline: e.target.value}; setEditData(d => ({...d, cards: c})); }}
+                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#d4af37", fontSize: 14, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16 }} rows={2} />
+                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8 }}>BODY</div>
+                <textarea value={editData.cards[idx-1]?.body || ""} onChange={e => { const c = [...editData.cards]; c[idx-1] = {...c[idx-1], body: e.target.value}; setEditData(d => ({...d, cards: c})); }}
+                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={5} />
+              </div>
+            )}
+            {idx === allCards.length - 1 && (
+              <div>
+                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>CTA TEXT</div>
+                <textarea value={editData.ctaCard} onChange={e => setEditData(d => ({...d, ctaCard: e.target.value}))}
+                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16 }} rows={3} />
+                <button onClick={() => setShowCtaPicker(true)} style={{ width: "100%", padding: "13px", background: "#0a0a0a", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>
+                  Or pick from CTA library →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div style={{ padding: "10px 20px 28px" }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 12 }}>
           {allCards.map((_, i) => <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />)}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0} style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 14, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
-          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1} style={{ padding: "13px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 14, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
+          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0} style={{ padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
+          <button onClick={() => setEditing(true)} style={{ padding: "12px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
+          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1} style={{ padding: "12px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
         </div>
-        <div style={{ marginTop: 14, background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px" }}>
+        {idx === allCards.length - 1 && (
+          <button onClick={() => setShowCtaPicker(true)} style={{ width: "100%", padding: "11px", background: "#0a0a0a", border: "1px solid #d4af3760", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginBottom: 10 }}>
+            🎯 Change CTA
+          </button>
+        )}
+        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px" }}>
           <div style={{ fontSize: 10, color: "#555", marginBottom: 6, letterSpacing: 1 }}>CAPTION</div>
-          <div style={{ fontSize: 12, color: "#888", lineHeight: 1.5, marginBottom: 8 }}>{data.caption}</div>
-          <CopyBtn text={`${data.caption}\n\n${data.hashtags?.join(" ")}`} />
+          <textarea value={editData.caption} onChange={e => setEditData(d => ({...d, caption: e.target.value}))}
+            style={{ width: "100%", background: "transparent", border: "none", color: "#888", fontSize: 12, fontFamily: "inherit", resize: "none", outline: "none", lineHeight: 1.5, boxSizing: "border-box", marginBottom: 8 }} rows={2} />
+          <CopyBtn text={`${editData.caption}\n\n${editData.hashtags?.join(" ")}`} />
         </div>
       </div>
     </div>
@@ -215,6 +318,13 @@ function VideoAnimator({ data, style, onClose }) {
   const chunksRef = useRef([]);
   const shots = data.shots || [];
   const touchX = useRef(null);
+
+  // Kill speech on unmount
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   const speak = (text, onEnd) => {
     window.speechSynthesis.cancel();
@@ -386,7 +496,7 @@ function VideoAnimator({ data, style, onClose }) {
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111" }}>
-        <button onClick={() => { window.speechSynthesis.cancel(); onClose(); }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <button onClick={() => { window.speechSynthesis.cancel(); window.speechSynthesis.cancel(); setPhase("ready"); setShotIdx(0); setWordIdx(-1); onClose(); }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{clean(data.title)}</div>
           <div style={{ fontSize: 10, color: "#333" }}>Style {style} · Shot {shotIdx + 1}/{shots.length}</div>
@@ -470,7 +580,7 @@ function VideoAnimator({ data, style, onClose }) {
 
       {phase === "playing" && (
         <div style={{ padding: "10px 20px 32px" }}>
-          <button onClick={() => { window.speechSynthesis.cancel(); setPhase("ready"); setShotIdx(0); setWordIdx(-1); }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop Preview</button>
+          <button onClick={() => { window.speechSynthesis.cancel(); window.speechSynthesis.cancel(); setTimeout(() => window.speechSynthesis.cancel(), 100); setPhase("ready"); setShotIdx(0); setWordIdx(-1); }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop</button>
         </div>
       )}
 
