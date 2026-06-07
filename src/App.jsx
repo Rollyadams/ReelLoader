@@ -211,20 +211,20 @@ function CardsViewer({ data, topic, onClose }) {
   };
   const c = allCards[idx];
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...S }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...S, overflow: "hidden" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{idx + 1} / {allCards.length}</div>
         <div style={{ fontSize: 10, color: "#2a2a2a" }}>Screenshot to save</div>
       </div>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", userSelect: "none" }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", userSelect: "none", position: "relative" }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div style={{ width: "100%", maxWidth: 380 }}>
           <CardSlide {...c} topic={topic} />
         </div>
       </div>
       {/* CTA Picker Modal */}
       {showCtaPicker && (
-        <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.95)", zIndex: 10, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1001, display: "flex", flexDirection: "column" }}>
           <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
             <button onClick={() => setShowCtaPicker(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
@@ -242,7 +242,7 @@ function CardsViewer({ data, topic, onClose }) {
 
       {/* Edit Modal */}
       {editing && (
-        <div style={{ position: "absolute", inset: 0, background: "#000", zIndex: 10, display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1001, display: "flex", flexDirection: "column", fontFamily: "'Space Grotesk',sans-serif" }}>
           <div style={{ padding: "14px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
             <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>Edit Card {idx + 1}</div>
@@ -355,21 +355,30 @@ function VideoAnimator({ data, style, onClose }) {
   };
 
   // Play preview
+  const isPlayingRef = useRef(false);
+
   const playPreview = useCallback(() => {
     setPhase("playing"); setShotIdx(0); setWordIdx(0);
+    isPlayingRef.current = true;
     let i = 0;
     const next = () => {
-      if (i >= shots.length) { setPhase("ready"); setShotIdx(0); setWordIdx(-1); return; }
+      if (!isPlayingRef.current || i >= shots.length) {
+        isPlayingRef.current = false;
+        setPhase("ready"); setShotIdx(0); setWordIdx(-1);
+        window.speechSynthesis.cancel();
+        return;
+      }
       setVisible(false);
       setTimeout(() => {
+        if (!isPlayingRef.current) return;
         setShotIdx(i);
         setVisible(true);
         const words = clean(shots[i].voiceover).split(" ");
         let wIdx = 0;
         setWordIdx(0);
-        // Highlight words one by one as voice speaks
-        const msPerWord = Math.max(200, Math.min(400, (shots[i].voiceover.length / words.length) * 80));
+        const msPerWord = Math.max(180, Math.min(380, (shots[i].voiceover.length / words.length) * 80));
         const wordTimer = setInterval(() => {
+          if (!isPlayingRef.current) { clearInterval(wordTimer); return; }
           wIdx++;
           if (wIdx >= words.length) { clearInterval(wordTimer); setWordIdx(-1); }
           else setWordIdx(wIdx);
@@ -378,7 +387,7 @@ function VideoAnimator({ data, style, onClose }) {
           clearInterval(wordTimer);
           setWordIdx(-1);
           i++;
-          setTimeout(next, 500);
+          setTimeout(next, 400);
         });
       }, 150);
     };
@@ -496,7 +505,14 @@ function VideoAnimator({ data, style, onClose }) {
 
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111" }}>
-        <button onClick={() => { window.speechSynthesis.cancel(); window.speechSynthesis.cancel(); setPhase("ready"); setShotIdx(0); setWordIdx(-1); onClose(); }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <button onClick={() => {
+          isPlayingRef.current = false;
+          window.speechSynthesis.cancel();
+          setTimeout(() => window.speechSynthesis.cancel(), 50);
+          setTimeout(() => window.speechSynthesis.cancel(), 200);
+          setPhase("ready"); setShotIdx(0); setWordIdx(-1);
+          onClose();
+        }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{clean(data.title)}</div>
           <div style={{ fontSize: 10, color: "#333" }}>Style {style} · Shot {shotIdx + 1}/{shots.length}</div>
@@ -580,7 +596,13 @@ function VideoAnimator({ data, style, onClose }) {
 
       {phase === "playing" && (
         <div style={{ padding: "10px 20px 32px" }}>
-          <button onClick={() => { window.speechSynthesis.cancel(); window.speechSynthesis.cancel(); setTimeout(() => window.speechSynthesis.cancel(), 100); setPhase("ready"); setShotIdx(0); setWordIdx(-1); }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop</button>
+          <button onClick={() => {
+          isPlayingRef.current = false;
+          window.speechSynthesis.cancel();
+          setTimeout(() => window.speechSynthesis.cancel(), 50);
+          setTimeout(() => window.speechSynthesis.cancel(), 200);
+          setPhase("ready"); setShotIdx(0); setWordIdx(-1);
+        }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop</button>
         </div>
       )}
 
