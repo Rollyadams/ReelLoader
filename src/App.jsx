@@ -254,15 +254,16 @@ function VideoAnimator({ data, style, onClose }) {
       setTimeout(() => {
         setShotIdx(i);
         setVisible(true);
-        const words = clean(shots[i].textOverlay).split(" ");
+        const words = clean(shots[i].voiceover).split(" ");
         let wIdx = 0;
         setWordIdx(0);
-        // Animate words appearing one by one
+        // Highlight words one by one as voice speaks
+        const msPerWord = Math.max(200, Math.min(400, (shots[i].voiceover.length / words.length) * 80));
         const wordTimer = setInterval(() => {
           wIdx++;
           if (wIdx >= words.length) { clearInterval(wordTimer); setWordIdx(-1); }
           else setWordIdx(wIdx);
-        }, 400);
+        }, msPerWord);
         speak(shots[i].voiceover, () => {
           clearInterval(wordTimer);
           setWordIdx(-1);
@@ -407,30 +408,37 @@ function VideoAnimator({ data, style, onClose }) {
 
           {/* Content */}
           {style === "A" ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", flexDirection: "column", gap: 10 }}>
-              {clean(shot.textOverlay).split(" ").map((word, wi) => {
-                const show = wordIdx === -1 || wi <= wordIdx;
-                return (
-                  <div key={wi} style={{
-                    fontSize: 38, fontWeight: 900,
-                    color: wi % 2 === 0 ? "#ffffff" : "#d4af37",
-                    lineHeight: 1.1, textAlign: "center",
-                    textTransform: "uppercase", letterSpacing: -1,
-                    opacity: show ? 1 : 0,
-                    transform: show ? "translateY(0) scale(1)" : "translateY(12px) scale(0.95)",
-                    transition: "opacity 0.2s ease, transform 0.2s ease",
-                  }}>{word}</div>
-                );
-              })}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 0 }}>
+              {/* Small label at top */}
+              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", marginBottom: 16, opacity: 0.7 }}>{clean(shot.textOverlay)}</div>
+              {/* Main message - voiceover text, word by word */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignContent: "flex-start" }}>
+                {clean(shot.voiceover).split(" ").map((word, wi) => {
+                  const show = wordIdx === -1 || wi <= wordIdx;
+                  return (
+                    <span key={wi} style={{
+                      fontSize: 26, fontWeight: 800,
+                      color: "#ffffff",
+                      lineHeight: 1.35,
+                      opacity: show ? 1 : 0.15,
+                      transition: "opacity 0.25s ease",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                    }}>{word}</span>
+                  );
+                })}
+              </div>
             </div>
           ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 0", gap: 14 }}>
-              <div style={{ fontSize: 18, fontWeight: 900, color: "#d4af37", textAlign: "center", lineHeight: 1.2 }}>{clean(shot.textOverlay)}</div>
-              <div style={{ height: 2, background: "rgba(212,175,55,0.2)", borderRadius: 1 }} />
-              <div style={{ fontSize: 13, color: "#ccc", textAlign: "center", lineHeight: 1.6, fontStyle: "italic" }}>{clean(shot.voiceover)}</div>
-              <div style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 8, padding: "8px 12px" }}>
-                <div style={{ fontSize: 9, color: "#444", letterSpacing: 1.5, marginBottom: 4 }}>VISUAL</div>
-                <div style={{ fontSize: 11, color: "#555" }}>{clean(shot.visual)}</div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 12 }}>
+              {/* Small topic label */}
+              <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", opacity: 0.8 }}>{clean(shot.textOverlay)}</div>
+              <div style={{ width: 28, height: 2, background: "#d4af37", borderRadius: 1, opacity: 0.4 }} />
+              {/* Main voiceover - big and readable */}
+              <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", lineHeight: 1.55 }}>{clean(shot.voiceover)}</div>
+              {/* Visual hint - small at bottom */}
+              <div style={{ marginTop: 4, padding: "6px 10px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6 }}>
+                <div style={{ fontSize: 9, color: "#333", letterSpacing: 1.5, marginBottom: 3 }}>VISUAL</div>
+                <div style={{ fontSize: 10, color: "#444" }}>{clean(shot.visual)}</div>
               </div>
             </div>
           )}
