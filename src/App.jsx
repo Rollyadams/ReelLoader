@@ -249,8 +249,15 @@ function VideoAnimator({ data, style, onClose }) {
     let i = 0;
     const next = () => {
       if (i >= shots.length) { setPhase("ready"); setShotIdx(0); return; }
-      setShotIdx(i); setVisible(false);
-      setTimeout(() => { setVisible(true); speak(shots[i].voiceover, () => { i++; setTimeout(next, 400); }); }, 200);
+      setVisible(false);
+      setTimeout(() => {
+        setShotIdx(i);
+        setVisible(true);
+        speak(shots[i].voiceover, () => {
+          i++;
+          setTimeout(next, 600);
+        });
+      }, 150);
     };
     next();
   }, [shots]);
@@ -262,14 +269,18 @@ function VideoAnimator({ data, style, onClose }) {
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 
     if (videoStyle === "A") {
-      // Style A: bold text center
-      ctx.fillStyle = "#d4af37";
-      ctx.font = `bold ${Math.floor(W * 0.08)}px Space Grotesk, sans-serif`;
+      // Style A: each word stacked, alternating white/gold
+      const words = clean(shot.textOverlay).toUpperCase().split(" ");
+      const fontSize = Math.floor(W * 0.09);
+      ctx.font = `900 ${fontSize}px sans-serif`;
       ctx.textAlign = "center";
-      const words = clean(shot.textOverlay).split(" ");
-      const lineH = Math.floor(W * 0.1);
-      const startY = H / 2 - (words.length * lineH) / 2 + lineH * 0.6;
-      words.forEach((w, wi) => ctx.fillText(w, W / 2, startY + wi * lineH));
+      const lineH = Math.floor(fontSize * 1.15);
+      const totalH = words.length * lineH;
+      const startY = H / 2 - totalH / 2 + fontSize * 0.8;
+      words.forEach((w, wi) => {
+        ctx.fillStyle = wi % 2 === 0 ? "#ffffff" : "#d4af37";
+        ctx.fillText(w, W / 2, startY + wi * lineH);
+      });
     } else {
       // Style B: slide layout
       ctx.fillStyle = "#d4af37";
@@ -373,7 +384,7 @@ function VideoAnimator({ data, style, onClose }) {
       {/* Video stage */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", userSelect: "none" }}
         onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div style={{ width: "100%", maxWidth: 320, aspectRatio: "9/16", background: "#000", borderRadius: 14, border: "1px solid #1a1a1a", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 20px", boxSizing: "border-box", position: "relative", overflow: "hidden", transition: "opacity 0.2s", opacity: visible ? 1 : 0 }}>
+        <div style={{ width: "100%", maxWidth: 320, aspectRatio: "9/16", background: "#000", borderRadius: 14, border: "1px solid #1a1a1a", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 20px", boxSizing: "border-box", position: "relative", overflow: "hidden", transition: "opacity 0.15s ease", opacity: visible ? 1 : 0 }}>
           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 0%,#d4af3710 0%,transparent 60%)", pointerEvents: "none" }} />
 
           {/* Top */}
@@ -384,8 +395,10 @@ function VideoAnimator({ data, style, onClose }) {
 
           {/* Content */}
           {style === "A" ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0" }}>
-              <div style={{ fontSize: 32, fontWeight: 900, color: "#fff", lineHeight: 1.2, textAlign: "center" }}>{clean(shot.textOverlay)}</div>
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", flexDirection: "column", gap: 8 }}>
+              {clean(shot.textOverlay).split(" ").map((word, wi) => (
+                <div key={wi} style={{ fontSize: 36, fontWeight: 900, color: wi % 2 === 0 ? "#fff" : "#d4af37", lineHeight: 1.1, textAlign: "center", textTransform: "uppercase", letterSpacing: -1 }}>{word}</div>
+              ))}
             </div>
           ) : (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 0", gap: 14 }}>
