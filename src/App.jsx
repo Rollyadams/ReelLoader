@@ -207,6 +207,7 @@ function VideoAnimator({ data, style, onClose }) {
   const [phase, setPhase] = useState("ready"); // ready | playing | recording | done
   const [shotIdx, setShotIdx] = useState(0);
   const [visible, setVisible] = useState(true);
+  const [wordIdx, setWordIdx] = useState(-1); // -1 = show all words
   const [videoURL, setVideoURL] = useState("");
   const [exportProgress, setExportProgress] = useState(0);
   const canvasRef = useRef(null);
@@ -245,17 +246,28 @@ function VideoAnimator({ data, style, onClose }) {
 
   // Play preview
   const playPreview = useCallback(() => {
-    setPhase("playing"); setShotIdx(0);
+    setPhase("playing"); setShotIdx(0); setWordIdx(0);
     let i = 0;
     const next = () => {
-      if (i >= shots.length) { setPhase("ready"); setShotIdx(0); return; }
+      if (i >= shots.length) { setPhase("ready"); setShotIdx(0); setWordIdx(-1); return; }
       setVisible(false);
       setTimeout(() => {
         setShotIdx(i);
         setVisible(true);
+        const words = clean(shots[i].textOverlay).split(" ");
+        let wIdx = 0;
+        setWordIdx(0);
+        // Animate words appearing one by one
+        const wordTimer = setInterval(() => {
+          wIdx++;
+          if (wIdx >= words.length) { clearInterval(wordTimer); setWordIdx(-1); }
+          else setWordIdx(wIdx);
+        }, 400);
         speak(shots[i].voiceover, () => {
+          clearInterval(wordTimer);
+          setWordIdx(-1);
           i++;
-          setTimeout(next, 600);
+          setTimeout(next, 500);
         });
       }, 150);
     };
@@ -395,10 +407,21 @@ function VideoAnimator({ data, style, onClose }) {
 
           {/* Content */}
           {style === "A" ? (
-            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", flexDirection: "column", gap: 8 }}>
-              {clean(shot.textOverlay).split(" ").map((word, wi) => (
-                <div key={wi} style={{ fontSize: 36, fontWeight: 900, color: wi % 2 === 0 ? "#fff" : "#d4af37", lineHeight: 1.1, textAlign: "center", textTransform: "uppercase", letterSpacing: -1 }}>{word}</div>
-              ))}
+            <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px 0", flexDirection: "column", gap: 10 }}>
+              {clean(shot.textOverlay).split(" ").map((word, wi) => {
+                const show = wordIdx === -1 || wi <= wordIdx;
+                return (
+                  <div key={wi} style={{
+                    fontSize: 38, fontWeight: 900,
+                    color: wi % 2 === 0 ? "#ffffff" : "#d4af37",
+                    lineHeight: 1.1, textAlign: "center",
+                    textTransform: "uppercase", letterSpacing: -1,
+                    opacity: show ? 1 : 0,
+                    transform: show ? "translateY(0) scale(1)" : "translateY(12px) scale(0.95)",
+                    transition: "opacity 0.2s ease, transform 0.2s ease",
+                  }}>{word}</div>
+                );
+              })}
             </div>
           ) : (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 0", gap: 14 }}>
@@ -439,7 +462,7 @@ function VideoAnimator({ data, style, onClose }) {
 
       {phase === "playing" && (
         <div style={{ padding: "10px 20px 32px" }}>
-          <button onClick={() => { window.speechSynthesis.cancel(); setPhase("ready"); setShotIdx(0); }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop Preview</button>
+          <button onClick={() => { window.speechSynthesis.cancel(); setPhase("ready"); setShotIdx(0); setWordIdx(-1); }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop Preview</button>
         </div>
       )}
 
