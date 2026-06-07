@@ -30,7 +30,7 @@ async function groq(prompt, isArray = false) {
     body: JSON.stringify({
       model: MODEL, max_tokens: 2500, temperature: 0.6,
       messages: [
-        { role: "system", content: "You are a JSON API. Return ONLY raw valid JSON — no markdown, no backticks, no asterisks inside string values, no bold, no italic, no explanation. Plain text in all string values." },
+        { role: "system", content: "You are a JSON API. Return ONLY raw valid JSON — no markdown, no backticks, no asterisks inside string values, no bold, no italic, no explanation. Plain text in all string values. NEVER include brand names, company names, or website URLs inside shot voiceover or textOverlay fields." },
         { role: "user", content: prompt }
       ]
     })
@@ -41,8 +41,19 @@ async function groq(prompt, isArray = false) {
   const o = isArray ? "[" : "{", c = isArray ? "]" : "}";
   const si = text.indexOf(o), ei = text.lastIndexOf(c) + 1;
   if (si === -1) throw new Error("Invalid response. Please try again.");
-  try { return JSON.parse(text.slice(si, ei)); }
-  catch { return JSON.parse(text.slice(si, ei).replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/,\s*([}\]])/g, "$1").replace(/[\u0000-\u001F]/g, " ")); }
+  let parsed;
+  try { parsed = JSON.parse(text.slice(si, ei)); }
+  catch { parsed = JSON.parse(text.slice(si, ei).replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/,\s*([}\]])/g, "$1").replace(/[\u0000-\u001F]/g, " ")); }
+  if (!parsed) return parsed;
+  // Force-clean brand from last video shot
+  if (Array.isArray(parsed?.shots) && parsed.shots.length > 0) {
+    const last = parsed.shots[parsed.shots.length - 1];
+    const nb = (s) => (s||"").replace(/rollyadams[\w\s]*?(nigeria)?/gi,"").replace(/rollyadamstechworld\.com\.ng/gi,"").replace(/\s{2,}/g," ").trim();
+    last.voiceover = nb(last.voiceover);
+    last.textOverlay = nb(last.textOverlay);
+    last.visual = nb(last.visual);
+  }
+  return parsed;
 }
 
 // ─── PROMPTS ──────────────────────────────────────────────────────────────────
@@ -79,7 +90,7 @@ Shot 2: Why it matters to the viewer
 Shot 3: Core concept explained simply
 Shot 4: Real-world example
 Shot 5: Key insight or takeaway
-Shot 6: Simple engagement close — encourage likes, shares, follows. Warm and genuine.
+Shot 6: Simple closing line only. Example voiceover: "If you found this helpful, like and share." Example textOverlay: "Like. Share. Follow." NO brand names, NO company names, NO website URLs in shot 6.
 
 Return ONLY this JSON:
 {"title":"plain video title","audioVibe":"music description","keyTakeaway":"one sentence","shots":[{"timestamp":"00:00-00:10","textOverlay":"2-5 bold words for screen","voiceover":"what to say out loud","visual":"what to show or animate"},{"timestamp":"00:10-00:20","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:20-00:30","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:30-00:40","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:40-00:50","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:50-01:00","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"}],"caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
