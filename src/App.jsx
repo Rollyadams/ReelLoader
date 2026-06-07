@@ -185,22 +185,22 @@ function CardSlide({ headline, body, num, total, isHook, isCta, topic }) {
 // ─── CARDS VIEWER ─────────────────────────────────────────────────────────────
 function CardsViewer({ data, topic, onClose }) {
   const [idx, setIdx] = useState(0);
-  const [editing, setEditing] = useState(false);
+  const [view, setView] = useState("cards"); // cards | edit | cta
   const [editData, setEditData] = useState({
-    hookCard: data.hookCard,
-    cards: data.cards ? [...data.cards.map(c => ({...c}))] : [],
-    ctaCard: data.ctaCard,
-    caption: data.caption,
-    hashtags: data.hashtags,
+    hookCard: data.hookCard || "",
+    cards: (data.cards || []).map(c => ({ ...c })),
+    ctaCard: data.ctaCard || "",
+    caption: data.caption || "",
+    hashtags: data.hashtags || [],
   });
-  const [showCtaPicker, setShowCtaPicker] = useState(false);
   const touchX = useRef(null);
 
   const allCards = [
     { isHook: true, headline: editData.hookCard },
-    ...(editData.cards || []).map((c, i) => ({ headline: c.headline, body: c.body, num: i + 1, total: editData.cards.length })),
+    ...editData.cards.map((c, i) => ({ headline: c.headline, body: c.body, num: i + 1, total: editData.cards.length })),
     { isCta: true, headline: editData.ctaCard },
   ];
+
   const onTouchStart = e => { touchX.current = e.touches[0].clientX; };
   const onTouchEnd = e => {
     if (!touchX.current) return;
@@ -209,96 +209,139 @@ function CardsViewer({ data, topic, onClose }) {
     if (d < -50 && idx > 0) setIdx(i => i - 1);
     touchX.current = null;
   };
-  const c = allCards[idx];
+
+  const SS = { fontFamily: "'Space Grotesk',sans-serif" };
+
+  // ── CTA PICKER SCREEN
+  if (view === "cta") return (
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
+        <button onClick={() => setView("edit")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
+        <div style={{ width: 30 }} />
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
+        {CTA_OPTIONS.map((cta, i) => (
+          <button key={i} onClick={() => { setEditData(d => ({ ...d, ctaCard: cta })); setView("edit"); }}
+            style={{ width: "100%", padding: "14px 16px", background: editData.ctaCard === cta ? "#1a1400" : "#0a0a0a", border: `1px solid ${editData.ctaCard === cta ? "#d4af37" : "#1a1a1a"}`, borderRadius: 8, color: editData.ctaCard === cta ? "#d4af37" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer", textAlign: "left", marginBottom: 8, fontFamily: "inherit" }}>
+            {cta}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  // ── EDIT SCREEN
+  if (view === "edit") return (
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
+        <button onClick={() => setView("cards")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>
+          {idx === 0 ? "Edit Hook" : idx === allCards.length - 1 ? "Edit CTA" : `Edit Card ${idx}`}
+        </div>
+        <button onClick={() => setView("cards")} style={{ padding: "7px 16px", background: "#d4af37", border: "none", color: "#000", fontSize: 13, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done ✓</button>
+      </div>
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px" }}>
+        {idx === 0 && (
+          <div>
+            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Hook Card Text</div>
+            <textarea value={editData.hookCard} onChange={e => setEditData(d => ({ ...d, hookCard: e.target.value }))}
+              placeholder="Type your hook question or fact..."
+              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={5} />
+          </div>
+        )}
+
+        {idx > 0 && idx < allCards.length - 1 && (
+          <div>
+            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Headline</div>
+            <textarea value={editData.cards[idx - 1]?.headline || ""}
+              onChange={e => { const c = editData.cards.map((x, i) => i === idx - 1 ? { ...x, headline: e.target.value } : x); setEditData(d => ({ ...d, cards: c })); }}
+              placeholder="Short headline (2-4 words)..."
+              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#d4af37", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 20 }} rows={2} />
+            <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Body Text</div>
+            <textarea value={editData.cards[idx - 1]?.body || ""}
+              onChange={e => { const c = editData.cards.map((x, i) => i === idx - 1 ? { ...x, body: e.target.value } : x); setEditData(d => ({ ...d, cards: c })); }}
+              placeholder="Paste or type your content here..."
+              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={6} />
+          </div>
+        )}
+
+        {idx === allCards.length - 1 && (
+          <div>
+            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>CTA Text</div>
+            <textarea value={editData.ctaCard}
+              onChange={e => setEditData(d => ({ ...d, ctaCard: e.target.value }))}
+              placeholder="Your call to action..."
+              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16, lineHeight: 1.5 }} rows={3} />
+            <button onClick={() => setView("cta")}
+              style={{ width: "100%", padding: "14px", background: "#0a0a0a", border: "2px solid #d4af37", color: "#d4af37", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 8, marginBottom: 20 }}>
+              🎯 Pick from CTA Library (25 options)
+            </button>
+          </div>
+        )}
+
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Caption</div>
+          <textarea value={editData.caption} onChange={e => setEditData(d => ({ ...d, caption: e.target.value }))}
+            style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px", color: "#888", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={3} />
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── MAIN CARDS VIEW
+  const card = allCards[idx];
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...S, overflow: "hidden" }}>
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
+      {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
         <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{idx + 1} / {allCards.length}</div>
-        <div style={{ fontSize: 10, color: "#2a2a2a" }}>Screenshot to save</div>
+        <button onClick={() => setView("edit")} style={{ padding: "7px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
       </div>
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", userSelect: "none", position: "relative" }} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+
+      {/* Card display */}
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", userSelect: "none" }}
+        onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div style={{ width: "100%", maxWidth: 380 }}>
-          <CardSlide {...c} topic={topic} />
+          <CardSlide {...card} topic={topic} />
         </div>
       </div>
-      {/* CTA Picker Modal */}
-      {showCtaPicker && (
-        <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1001, display: "flex", flexDirection: "column" }}>
-          <div style={{ padding: "16px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
-            <button onClick={() => setShowCtaPicker(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>✕</button>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-            {CTA_OPTIONS.map((cta, i) => (
-              <button key={i} onClick={() => { setEditData(d => ({...d, ctaCard: cta})); setShowCtaPicker(false); setIdx(allCards.length - 1); }}
-                style={{ width: "100%", padding: "13px 14px", background: editData.ctaCard === cta ? "#1a1400" : "#0a0a0a", border: `1px solid ${editData.ctaCard === cta ? "#d4af37" : "#1a1a1a"}`, borderRadius: 8, color: editData.ctaCard === cta ? "#d4af37" : "#888", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", marginBottom: 8, fontFamily: "inherit" }}>
-                {cta}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {/* Edit Modal */}
-      {editing && (
-        <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1001, display: "flex", flexDirection: "column", fontFamily: "'Space Grotesk',sans-serif" }}>
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <button onClick={() => setEditing(false)} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
-            <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>Edit Card {idx + 1}</div>
-            <button onClick={() => setEditing(false)} style={{ padding: "6px 14px", background: "#d4af37", border: "none", color: "#000", fontSize: 12, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done</button>
-          </div>
-          <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px" }}>
-            {idx === 0 && (
-              <div>
-                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HOOK CARD</div>
-                <textarea value={editData.hookCard} onChange={e => setEditData(d => ({...d, hookCard: e.target.value}))}
-                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={4} />
-              </div>
-            )}
-            {idx > 0 && idx < allCards.length - 1 && (
-              <div>
-                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HEADLINE</div>
-                <textarea value={editData.cards[idx-1]?.headline || ""} onChange={e => { const c = [...editData.cards]; c[idx-1] = {...c[idx-1], headline: e.target.value}; setEditData(d => ({...d, cards: c})); }}
-                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#d4af37", fontSize: 14, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16 }} rows={2} />
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8 }}>BODY</div>
-                <textarea value={editData.cards[idx-1]?.body || ""} onChange={e => { const c = [...editData.cards]; c[idx-1] = {...c[idx-1], body: e.target.value}; setEditData(d => ({...d, cards: c})); }}
-                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={5} />
-              </div>
-            )}
-            {idx === allCards.length - 1 && (
-              <div>
-                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>CTA TEXT</div>
-                <textarea value={editData.ctaCard} onChange={e => setEditData(d => ({...d, ctaCard: e.target.value}))}
-                  style={{ width: "100%", background: "#0a0a0a", border: "1px solid #222", borderRadius: 6, padding: "12px", color: "#fff", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16 }} rows={3} />
-                <button onClick={() => setShowCtaPicker(true)} style={{ width: "100%", padding: "13px", background: "#0a0a0a", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>
-                  Or pick from CTA library →
-                </button>
-              </div>
-            )}
-          </div>
+      {/* Bottom nav */}
+      <div style={{ padding: "10px 20px 32px", flexShrink: 0 }}>
+        {/* Progress dots */}
+        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 14 }}>
+          {allCards.map((_, i) => (
+            <div key={i} onClick={() => setIdx(i)}
+              style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />
+          ))}
         </div>
-      )}
 
-      <div style={{ padding: "10px 20px 28px" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 12 }}>
-          {allCards.map((_, i) => <div key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />)}
+        {/* Prev / Edit / Next */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
+          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}
+            style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
+          <button onClick={() => setView("edit")}
+            style={{ padding: "13px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
+          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1}
+            style={{ padding: "13px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
-          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0} style={{ padding: "12px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
-          <button onClick={() => setEditing(true)} style={{ padding: "12px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
-          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1} style={{ padding: "12px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
-        </div>
+
+        {/* CTA shortcut on last card */}
         {idx === allCards.length - 1 && (
-          <button onClick={() => setShowCtaPicker(true)} style={{ width: "100%", padding: "11px", background: "#0a0a0a", border: "1px solid #d4af3760", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginBottom: 10 }}>
+          <button onClick={() => setView("cta")}
+            style={{ width: "100%", padding: "12px", background: "#0a0a0a", border: "1px solid #d4af3750", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, marginBottom: 10 }}>
             🎯 Change CTA
           </button>
         )}
-        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px" }}>
-          <div style={{ fontSize: 10, color: "#555", marginBottom: 6, letterSpacing: 1 }}>CAPTION</div>
-          <textarea value={editData.caption} onChange={e => setEditData(d => ({...d, caption: e.target.value}))}
-            style={{ width: "100%", background: "transparent", border: "none", color: "#888", fontSize: 12, fontFamily: "inherit", resize: "none", outline: "none", lineHeight: 1.5, boxSizing: "border-box", marginBottom: 8 }} rows={2} />
-          <CopyBtn text={`${editData.caption}\n\n${editData.hashtags?.join(" ")}`} />
+
+        {/* Caption copy */}
+        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 12, color: "#555", flex: 1, marginRight: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{editData.caption}</div>
+          <CopyBtn text={`${editData.caption}
+
+${editData.hashtags?.join(" ")}`} />
         </div>
       </div>
     </div>
