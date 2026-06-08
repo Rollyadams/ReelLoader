@@ -85,8 +85,11 @@ async function groq(prompt, isArray = false) {
 }
 
 // ─── PROMPTS ──────────────────────────────────────────────────────────────────
-function cardsPrompt(topic, catLabel) {
-  return `Create 5 Instagram carousel cards explaining: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.
+function cardsPrompt(topic, catLabel, ownContent = "") {
+  const contentInstruction = ownContent.trim()
+    ? `\n\nUSE THIS CONTENT AS THE SOURCE MATERIAL — rewrite it into the 5 cards format below. Do not invent new facts; use only what is provided:\n"""\n${ownContent.trim()}\n"""`
+    : "";
+  return `Create 5 Instagram carousel cards explaining: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.${contentInstruction}
 
 RULES — plain text only, no markdown, no asterisks:
 - Hook card: shocking question or fact, max 10 words
@@ -183,8 +186,8 @@ function CardSlide({ headline, body, num, total, isHook, isCta, topic }) {
 }
 
 // ─── CARDS VIEWER ─────────────────────────────────────────────────────────────
-function CardsViewer({ data, topic, onClose }) {
-  const [idx, setIdx] = useState(0);
+function CardsViewer({ data, topic, initialIdx = 0, onClose }) {
+  const [idx, setIdx] = useState(initialIdx);
   const [view, setView] = useState("cards"); // cards | edit | cta
   const [editData, setEditData] = useState({
     hookCard: data.hookCard || "",
@@ -366,8 +369,16 @@ function VideoAnimator({ data, style, onClose }) {
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
+      window.speechSynthesis.cancel();
     };
   }, []);
+
+  // Kill speech whenever phase leaves "playing"
+  useEffect(() => {
+    if (phase !== "playing") {
+      window.speechSynthesis.cancel();
+    }
+  }, [phase]);
 
   const speak = (text, onEnd) => {
     window.speechSynthesis.cancel();
@@ -430,7 +441,9 @@ function VideoAnimator({ data, style, onClose }) {
           clearInterval(wordTimer);
           setWordIdx(-1);
           i++;
-          setTimeout(next, 400);
+          setTimeout(() => {
+            if (isPlayingRef.current) next();
+          }, 400);
         });
       }, 150);
     };
@@ -551,8 +564,7 @@ function VideoAnimator({ data, style, onClose }) {
         <button onClick={() => {
           isPlayingRef.current = false;
           window.speechSynthesis.cancel();
-          setTimeout(() => window.speechSynthesis.cancel(), 50);
-          setTimeout(() => window.speechSynthesis.cancel(), 200);
+          window.speechSynthesis.cancel();
           setPhase("ready"); setShotIdx(0); setWordIdx(-1);
           onClose();
         }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
@@ -642,8 +654,7 @@ function VideoAnimator({ data, style, onClose }) {
           <button onClick={() => {
           isPlayingRef.current = false;
           window.speechSynthesis.cancel();
-          setTimeout(() => window.speechSynthesis.cancel(), 50);
-          setTimeout(() => window.speechSynthesis.cancel(), 200);
+          window.speechSynthesis.cancel();
           setPhase("ready"); setShotIdx(0); setWordIdx(-1);
         }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop</button>
         </div>
@@ -687,6 +698,8 @@ export default function App() {
   const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_STORAGE) || "[]"); } catch { return []; } });
   const [showCardsViewer, setShowCardsViewer] = useState(false);
   const [showVideoAnimator, setShowVideoAnimator] = useState(false);
+  const [cardsViewerIdx, setCardsViewerIdx] = useState(0);
+  const [ownContent, setOwnContent] = useState("");
 
   const cat = CATEGORIES.find(c => c.id === selCat);
 
@@ -702,7 +715,7 @@ export default function App() {
     try {
       if (selOutput === "cards") {
         setLoadMsg("🃏 Building your cards...");
-        const d = await groq(cardsPrompt(topic, cat?.label));
+        const d = await groq(cardsPrompt(topic, cat?.label, ownContent));
         setCardsData(d);
         const entry = { id: Date.now(), cat: selCat, output: "cards", style: null, topic, data: d, at: new Date().toLocaleString("en-GB") };
         const updated = [entry, ...history].slice(0, 30);
@@ -721,7 +734,7 @@ export default function App() {
     finally { setLoading(false); }
   }, [selCat, selOutput, selVideoStyle, cat, history]);
 
-  if (showCardsViewer && cardsData) return <CardsViewer data={cardsData} topic={selTopic} onClose={() => setShowCardsViewer(false)} />;
+  if (showCardsViewer && cardsData) return <CardsViewer data={cardsData} topic={selTopic} initialIdx={cardsViewerIdx} onClose={() => setShowCardsViewer(false)} />;
   if (showVideoAnimator && videoData) return <VideoAnimator data={videoData} style={selVideoStyle} onClose={() => setShowVideoAnimator(false)} />;
 
   // ── SPLASH
@@ -852,10 +865,19 @@ export default function App() {
         <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>Pick a Topic</h2>
         <p style={{ color: "#444", fontSize: 13, marginBottom: 20 }}>Or type your own</p>
         {error && <div style={{ color: "#ff5555", fontSize: 13, marginBottom: 14, padding: "10px 12px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: selOutput === "cards" ? 12 : 20 }}>
           <input value={customTopic} onChange={e => setCustomTopic(e.target.value)} onKeyDown={e => e.key === "Enter" && customTopic.trim() && generate(customTopic.trim())} placeholder="Type any topic..." style={{ flex: 1, padding: "12px 14px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 4, fontSize: 14, color: "#fff", outline: "none", fontFamily: "inherit" }} />
           <button onClick={() => customTopic.trim() && generate(customTopic.trim())} disabled={!customTopic.trim()} style={{ padding: "12px 18px", background: customTopic.trim() ? "#d4af37" : "#111", border: "none", color: customTopic.trim() ? "#000" : "#333", fontSize: 14, fontWeight: 700, cursor: customTopic.trim() ? "pointer" : "not-allowed", borderRadius: 4 }}>Go →</button>
         </div>
+        {selOutput === "cards" && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8, textTransform: "uppercase" }}>Or paste your own content (optional)</div>
+            <textarea value={ownContent} onChange={e => setOwnContent(e.target.value)}
+              placeholder="Paste your own content here and AI will reformat it into cards..."
+              style={{ width: "100%", background: "#0a0a0a", border: `1px solid ${ownContent.trim() ? "#d4af37" : "#222"}`, borderRadius: 6, padding: "12px 14px", color: "#ccc", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }} rows={4} />
+            {ownContent.trim() && <div style={{ fontSize: 11, color: "#d4af37", marginTop: 6 }}>✓ Your content will be reformatted into cards. Still pick a topic above.</div>}
+          </div>
+        )}
         <div style={{ fontSize: 10, color: "#2a2a2a", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Suggested</div>
         <div style={{ display: "grid", gap: 8 }}>
           {cat?.topics.map((t, i) => (
@@ -886,23 +908,32 @@ export default function App() {
         {/* CARDS RESULT */}
         {selOutput === "cards" && cardsData && (
           <div>
-            <button onClick={() => setShowCardsViewer(true)} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
-              📱 View Cards — Screenshot to Post
+            <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
+              📱 View & Edit Cards
             </button>
-            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3730", borderRadius: 10, padding: "14px 16px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HOOK CARD</div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#fff" }}>{clean(cardsData.hookCard)}</div>
+            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3730", borderRadius: 10, padding: "14px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HOOK CARD</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>{clean(cardsData.hookCard)}</div>
+              </div>
+              <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
             </div>
             {cardsData.cards?.map((c, i) => (
-              <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 6 }}>CARD {i + 1}</div>
-                <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, marginBottom: 4 }}>{clean(c.headline)}</div>
-                <div style={{ fontSize: 14, color: "#ccc" }}>{clean(c.body)}</div>
+              <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 6 }}>CARD {i + 1}</div>
+                  <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, marginBottom: 4 }}>{clean(c.headline)}</div>
+                  <div style={{ fontSize: 14, color: "#ccc" }}>{clean(c.body)}</div>
+                </div>
+                <button onClick={() => { setCardsViewerIdx(i + 1); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#0a0a0a", border: "1px solid #2a2a2a", color: "#555", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
               </div>
             ))}
-            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3330", borderRadius: 10, padding: "12px 16px", marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>CTA</div>
-              <div style={{ fontSize: 14, color: "#fff", fontWeight: 700 }}>{clean(cardsData.ctaCard)}</div>
+            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3330", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>CTA CARD</div>
+                <div style={{ fontSize: 14, color: "#fff", fontWeight: 700 }}>{clean(cardsData.ctaCard)}</div>
+              </div>
+              <button onClick={() => { setCardsViewerIdx((cardsData.cards?.length || 0) + 1); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
             </div>
             <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
@@ -914,7 +945,7 @@ export default function App() {
                 {cardsData.hashtags?.map((h, i) => <span key={i} style={{ background: "#111", border: "1px solid #1e1e1e", color: "#d4af37", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>)}
               </div>
             </div>
-            <button onClick={() => setShowCardsViewer(true)} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>📱 View Cards</button>
+            <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>📱 View Cards</button>
           </div>
         )}
 
