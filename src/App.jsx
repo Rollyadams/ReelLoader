@@ -87,7 +87,7 @@ async function groq(prompt, isArray = false) {
 // ─── PROMPTS ──────────────────────────────────────────────────────────────────
 function cardsPrompt(topic, catLabel, ownContent = "") {
   const contentInstruction = ownContent.trim()
-    ? `\n\nUSE THIS CONTENT AS THE SOURCE MATERIAL — rewrite it into the 5 cards format below. Do not invent new facts; use only what is provided:\n"""\n${ownContent.trim()}\n"""`
+    ? `\n\nSOURCE CONTENT TO REFORMAT (do not invent — use only what is below):\n"""\n${ownContent.trim()}\n"""\n\nSplit this content into exactly 5 distinct points or ideas — one idea per card body. Each card must cover a DIFFERENT part of the source content. Do NOT put all the content in card 1 only.`
     : "";
   return `Create 5 Instagram carousel cards explaining: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.${contentInstruction}
 
@@ -104,12 +104,16 @@ Return ONLY this JSON:
 {"hookCard":"max 10 word hook","cards":[{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"}],"ctaCard":"simple engagement CTA like: If you found this helpful, like and share. Max 15 words.","caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
 }
 
-function videoPrompt(topic, catLabel, style) {
+function videoPrompt(topic, catLabel, style, ownContent = "") {
   const styleGuide = style === "A"
     ? "Style A: Text-only animation. Bold words appear/fade on black. Like motivational reels. Each shot: 1 powerful sentence or phrase. Short, punchy, rhythm-driven."
     : "Style B: Educational slides. Each shot has a headline, explanation, and visual direction. Like explainer videos. Clear, informative, builds understanding.";
 
-  return `Write a 60-second educational video script about: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.
+  const contentInstruction = ownContent.trim()
+    ? `\n\nSOURCE CONTENT (reformat into the 6 shots below — do not invent. Spread content across ALL 6 shots, each shot covering a DIFFERENT part of the source):\n"""\n${ownContent.trim()}\n"""`
+    : "";
+
+  return `Write a 60-second educational video script about: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.${contentInstruction}
 
 ${styleGuide}
 
@@ -219,7 +223,7 @@ function CardsViewer({ data, topic, initialIdx = 0, onClose }) {
   if (view === "cta") return (
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={() => setView("edit")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <button onClick={() => setView("edit")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
         <div style={{ width: 30 }} />
       </div>
@@ -238,7 +242,7 @@ function CardsViewer({ data, topic, initialIdx = 0, onClose }) {
   if (view === "edit") return (
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={() => setView("cards")} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <button onClick={() => setView("cards")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>
           {idx === 0 ? "Edit Hook" : idx === allCards.length - 1 ? "Edit CTA" : `Edit Card ${idx}`}
         </div>
@@ -298,7 +302,7 @@ function CardsViewer({ data, topic, initialIdx = 0, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{idx + 1} / {allCards.length}</div>
         <button onClick={() => setView("edit")} style={{ padding: "7px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
       </div>
@@ -352,17 +356,19 @@ ${editData.hashtags?.join(" ")}`} />
 }
 
 // ─── VIDEO ANIMATOR ───────────────────────────────────────────────────────────
-function VideoAnimator({ data, style, onClose }) {
-  const [phase, setPhase] = useState("ready"); // ready | playing | recording | done
-  const [shotIdx, setShotIdx] = useState(0);
+function VideoAnimator({ data, style, initialShotIdx = 0, onClose }) {
+  const [phase, setPhase] = useState("ready");
+  const [view, setView] = useState(initialShotIdx > 0 ? "edit" : "player");
+  const [shotIdx, setShotIdx] = useState(initialShotIdx);
   const [visible, setVisible] = useState(true);
   const [wordIdx, setWordIdx] = useState(-1); // -1 = show all words
   const [videoURL, setVideoURL] = useState("");
   const [exportProgress, setExportProgress] = useState(0);
+  const [editShots, setEditShots] = useState(() => (data.shots || []).map(s => ({ ...s })));
   const canvasRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
-  const shots = data.shots || [];
+  const shots = editShots;
   const touchX = useRef(null);
 
   // Kill speech on unmount
@@ -380,12 +386,15 @@ function VideoAnimator({ data, style, onClose }) {
     }
   }, [phase]);
 
+  const updateShot = (i, field, val) => {
+    setEditShots(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
+  };
+
   const speak = (text, onEnd) => {
     window.speechSynthesis.cancel();
     const utt = new SpeechSynthesisUtterance(clean(text));
     utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
     const voices = window.speechSynthesis.getVoices();
-    // Prefer deeper male voice — closest to Nigerian English tone
     const v = voices.find(v => v.name.includes("David") && v.lang.startsWith("en"))
       || voices.find(v => v.name.includes("James") && v.lang.startsWith("en"))
       || voices.find(v => v.name.includes("Daniel") && v.lang.startsWith("en"))
@@ -457,7 +466,6 @@ function VideoAnimator({ data, style, onClose }) {
     ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
 
     if (videoStyle === "A") {
-      // Style A: each word stacked, alternating white/gold
       const words = clean(shot.textOverlay).toUpperCase().split(" ");
       const fontSize = Math.floor(W * 0.09);
       ctx.font = `900 ${fontSize}px sans-serif`;
@@ -470,7 +478,6 @@ function VideoAnimator({ data, style, onClose }) {
         ctx.fillText(w, W / 2, startY + wi * lineH);
       });
     } else {
-      // Style B: slide layout
       ctx.fillStyle = "#d4af37";
       ctx.font = `bold ${Math.floor(W * 0.055)}px Space Grotesk, sans-serif`;
       ctx.textAlign = "center";
@@ -486,13 +493,10 @@ function VideoAnimator({ data, style, onClose }) {
       lines.slice(0, 3).forEach((l, li) => ctx.fillText(l, W / 2, H * 0.45 + li * Math.floor(W * 0.05)));
     }
 
-    // Branding
     ctx.fillStyle = "#2a2a2a";
     ctx.font = `${Math.floor(W * 0.025)}px Space Grotesk, sans-serif`;
     ctx.textAlign = "left"; ctx.fillText("rollyadamstechworld.com.ng", W * 0.05, H * 0.95);
     ctx.textAlign = "right"; ctx.fillText("@rollyadamstechworld", W * 0.95, H * 0.95);
-
-    // Timestamp
     ctx.fillStyle = "#333";
     ctx.font = `${Math.floor(W * 0.028)}px monospace`;
     ctx.textAlign = "center"; ctx.fillText(shot.timestamp, W / 2, H * 0.05);
@@ -511,7 +515,7 @@ function VideoAnimator({ data, style, onClose }) {
     recorder.start(100);
     recorderRef.current = recorder;
 
-    let mouthState = false, blinkInterval = null;
+    let blinkInterval = null;
     const stopBlink = () => { if (blinkInterval) { clearInterval(blinkInterval); blinkInterval = null; } };
 
     for (let i = 0; i < shots.length; i++) {
@@ -519,10 +523,7 @@ function VideoAnimator({ data, style, onClose }) {
       setExportProgress(Math.round((i / shots.length) * 90));
       stopBlink();
       drawShotOnCanvas(canvas, shots[i], style);
-      blinkInterval = setInterval(() => {
-        mouthState = !mouthState;
-        drawShotOnCanvas(canvas, shots[i], style);
-      }, 300);
+      blinkInterval = setInterval(() => { drawShotOnCanvas(canvas, shots[i], style); }, 300);
       await new Promise(resolve => {
         const utt = new SpeechSynthesisUtterance(clean(shots[i].voiceover));
         utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
@@ -554,6 +555,56 @@ function VideoAnimator({ data, style, onClose }) {
   }, [shots, style]);
 
   const shot = shots[shotIdx] || {};
+  const SS = { fontFamily: "'Space Grotesk','Segoe UI',sans-serif" };
+
+  // ── EDIT SCREEN
+  if (view === "edit") return (
+    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
+        <button onClick={() => setView("player")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
+        <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>Edit Shot {shotIdx + 1} / {shots.length}</div>
+        <button onClick={() => setView("player")} style={{ padding: "7px 16px", background: "#d4af37", border: "none", color: "#000", fontSize: 13, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done ✓</button>
+      </div>
+
+      {/* Shot selector tabs */}
+      <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "10px 16px", borderBottom: "1px solid #111", flexShrink: 0 }}>
+        {shots.map((_, i) => (
+          <button key={i} onClick={() => setShotIdx(i)}
+            style={{ padding: "6px 14px", background: i === shotIdx ? "#d4af37" : "#0a0a0a", border: `1px solid ${i === shotIdx ? "#d4af37" : "#1a1a1a"}`, borderRadius: 4, color: i === shotIdx ? "#000" : "#555", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0, fontFamily: "inherit" }}>
+            {i + 1}
+          </button>
+        ))}
+      </div>
+
+      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px" }}>
+        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Text Overlay (on screen)</div>
+        <textarea value={editShots[shotIdx]?.textOverlay || ""}
+          onChange={e => updateShot(shotIdx, "textOverlay", e.target.value)}
+          placeholder="Bold text shown on screen..."
+          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#d4af37", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 20 }} rows={2} />
+
+        <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Voiceover (spoken aloud)</div>
+        <textarea value={editShots[shotIdx]?.voiceover || ""}
+          onChange={e => updateShot(shotIdx, "voiceover", e.target.value)}
+          placeholder="What the voice says..."
+          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, marginBottom: 20 }} rows={4} />
+
+        <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Visual Concept</div>
+        <textarea value={editShots[shotIdx]?.visual || ""}
+          onChange={e => updateShot(shotIdx, "visual", e.target.value)}
+          placeholder="What to show or animate on screen..."
+          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#888", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={3} />
+
+        {/* Nav between shots */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 24 }}>
+          <button onClick={() => setShotIdx(i => Math.max(0, i - 1))} disabled={shotIdx === 0}
+            style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: shotIdx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: shotIdx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev Shot</button>
+          <button onClick={() => setShotIdx(i => Math.min(shots.length - 1, i + 1))} disabled={shotIdx === shots.length - 1}
+            style={{ padding: "13px", background: shotIdx === shots.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${shotIdx === shots.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: shotIdx === shots.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: shotIdx === shots.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next Shot →</button>
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...S }}>
@@ -567,12 +618,13 @@ function VideoAnimator({ data, style, onClose }) {
           window.speechSynthesis.cancel();
           setPhase("ready"); setShotIdx(0); setWordIdx(-1);
           onClose();
-        }} style={{ background: "none", border: "none", color: "#555", fontSize: 20, cursor: "pointer" }}>←</button>
+        }} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{clean(data.title)}</div>
           <div style={{ fontSize: 10, color: "#333" }}>Style {style} · Shot {shotIdx + 1}/{shots.length}</div>
         </div>
-        <div style={{ fontSize: 10, color: "#2a2a2a" }}>{phase === "playing" ? "▶" : "●"}</div>
+        <button onClick={() => { window.speechSynthesis.cancel(); isPlayingRef.current = false; setPhase("ready"); setView("edit"); }}
+          style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
       </div>
 
       {/* Video stage */}
@@ -590,10 +642,8 @@ function VideoAnimator({ data, style, onClose }) {
           {/* Content */}
           {style === "A" ? (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 0 }}>
-              {/* Small label at top */}
               <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", marginBottom: 16, opacity: 0.7 }}>{clean(shot.textOverlay)}</div>
-              {/* Main message - voiceover text, word by word */}
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignContent: "flex-start" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignContent: "flex-start", marginBottom: 14 }}>
                 {clean(shot.voiceover).split(" ").map((word, wi) => {
                   const show = wordIdx === -1 || wi <= wordIdx;
                   return (
@@ -608,16 +658,19 @@ function VideoAnimator({ data, style, onClose }) {
                   );
                 })}
               </div>
+              {/* Visual concept — style A */}
+              <div style={{ padding: "8px 10px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 6 }}>
+                <div style={{ fontSize: 8, color: "#333", letterSpacing: 1.5, marginBottom: 2 }}>VISUAL</div>
+                <div style={{ fontSize: 10, color: "#444" }}>{clean(shot.visual)}</div>
+              </div>
             </div>
           ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 12 }}>
-              {/* Small topic label */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 10 }}>
               <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", opacity: 0.8 }}>{clean(shot.textOverlay)}</div>
               <div style={{ width: 28, height: 2, background: "#d4af37", borderRadius: 1, opacity: 0.4 }} />
-              {/* Main voiceover - big and readable */}
               <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", lineHeight: 1.55 }}>{clean(shot.voiceover)}</div>
-              {/* Visual hint - small at bottom */}
-              <div style={{ marginTop: 4, padding: "6px 10px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6 }}>
+              {/* Visual concept — style B */}
+              <div style={{ marginTop: 4, padding: "8px 10px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6 }}>
                 <div style={{ fontSize: 9, color: "#333", letterSpacing: 1.5, marginBottom: 3 }}>VISUAL</div>
                 <div style={{ fontSize: 10, color: "#444" }}>{clean(shot.visual)}</div>
               </div>
@@ -645,7 +698,7 @@ function VideoAnimator({ data, style, onClose }) {
           <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "center", gap: 8 }}>
             {shots.map((_, i) => <div key={i} onClick={() => setShotIdx(i)} style={{ width: i === shotIdx ? 20 : 6, height: 6, borderRadius: 3, background: i === shotIdx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />)}
           </div>
-          <div style={{ gridColumn: "1/-1", fontSize: 11, color: "#2a2a2a", textAlign: "center" }}>Swipe to browse shots manually</div>
+          <div style={{ gridColumn: "1/-1", fontSize: 11, color: "#2a2a2a", textAlign: "center" }}>Swipe to browse shots · ✏ Edit to change any shot</div>
         </div>
       )}
 
@@ -680,6 +733,7 @@ function VideoAnimator({ data, style, onClose }) {
   );
 }
 
+
 // ─── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -699,6 +753,7 @@ export default function App() {
   const [showCardsViewer, setShowCardsViewer] = useState(false);
   const [showVideoAnimator, setShowVideoAnimator] = useState(false);
   const [cardsViewerIdx, setCardsViewerIdx] = useState(0);
+  const [videoAnimatorIdx, setVideoAnimatorIdx] = useState(0);
   const [ownContent, setOwnContent] = useState("");
 
   const cat = CATEGORIES.find(c => c.id === selCat);
@@ -723,7 +778,7 @@ export default function App() {
         setScreen("result");
       } else {
         setLoadMsg("🎬 Writing video script...");
-        const d = await groq(videoPrompt(topic, cat?.label, selVideoStyle));
+        const d = await groq(videoPrompt(topic, cat?.label, selVideoStyle, ownContent));
         setVideoData(d);
         const entry = { id: Date.now(), cat: selCat, output: "video", style: selVideoStyle, topic, data: d, at: new Date().toLocaleString("en-GB") };
         const updated = [entry, ...history].slice(0, 30);
@@ -735,7 +790,7 @@ export default function App() {
   }, [selCat, selOutput, selVideoStyle, cat, history]);
 
   if (showCardsViewer && cardsData) return <CardsViewer data={cardsData} topic={selTopic} initialIdx={cardsViewerIdx} onClose={() => setShowCardsViewer(false)} />;
-  if (showVideoAnimator && videoData) return <VideoAnimator data={videoData} style={selVideoStyle} onClose={() => setShowVideoAnimator(false)} />;
+  if (showVideoAnimator && videoData) return <VideoAnimator data={videoData} style={selVideoStyle} initialShotIdx={videoAnimatorIdx} onClose={() => setShowVideoAnimator(false)} />;
 
   // ── SPLASH
   if (screen === "splash") return (
@@ -757,7 +812,7 @@ export default function App() {
   // ── SETUP
   if (screen === "setup") return (
     <div style={{ minHeight: "100dvh", background: "#000", padding: "60px 24px 40px", ...S }}>
-      <button onClick={() => setScreen("splash")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+      <button onClick={() => setScreen("splash")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
       <div style={{ marginTop: 24 }}>
         <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 10, textTransform: "uppercase" }}>One-time setup</div>
         <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 900, marginBottom: 24 }}>Connect Groq</h2>
@@ -799,7 +854,7 @@ export default function App() {
   // ── OUTPUT TYPE
   if (screen === "outputType") return (
     <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+      <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
       <div style={{ marginTop: 20 }}>
         <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{cat?.icon} {cat?.label}</div>
         <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>What to create?</h2>
@@ -827,7 +882,7 @@ export default function App() {
   // ── VIDEO STYLE
   if (screen === "videoStyle") return (
     <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      <button onClick={() => setScreen("outputType")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+      <button onClick={() => setScreen("outputType")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
       <div style={{ marginTop: 20 }}>
         <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Video Style</div>
         <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>Choose a style</h2>
@@ -859,7 +914,7 @@ export default function App() {
   if (screen === "topic") return (
     <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
       {loading && <Spinner msg={loadMsg} />}
-      <button onClick={() => setScreen(selOutput === "video" ? "videoStyle" : "outputType")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+      <button onClick={() => setScreen(selOutput === "video" ? "videoStyle" : "outputType")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
       <div style={{ marginTop: 20 }}>
         <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{cat?.icon} {cat?.label} · {selOutput === "cards" ? "🃏 Cards" : `🎬 Style ${selVideoStyle}`}</div>
         <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>Pick a Topic</h2>
@@ -869,13 +924,13 @@ export default function App() {
           <input value={customTopic} onChange={e => setCustomTopic(e.target.value)} onKeyDown={e => e.key === "Enter" && customTopic.trim() && generate(customTopic.trim())} placeholder="Type any topic..." style={{ flex: 1, padding: "12px 14px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 4, fontSize: 14, color: "#fff", outline: "none", fontFamily: "inherit" }} />
           <button onClick={() => customTopic.trim() && generate(customTopic.trim())} disabled={!customTopic.trim()} style={{ padding: "12px 18px", background: customTopic.trim() ? "#d4af37" : "#111", border: "none", color: customTopic.trim() ? "#000" : "#333", fontSize: 14, fontWeight: 700, cursor: customTopic.trim() ? "pointer" : "not-allowed", borderRadius: 4 }}>Go →</button>
         </div>
-        {selOutput === "cards" && (
+        {(selOutput === "cards" || selOutput === "video") && (
           <div style={{ marginBottom: 20 }}>
             <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8, textTransform: "uppercase" }}>Or paste your own content (optional)</div>
             <textarea value={ownContent} onChange={e => setOwnContent(e.target.value)}
-              placeholder="Paste your own content here and AI will reformat it into cards..."
+              placeholder={selOutput === "cards" ? "Paste your content — AI will spread it across all 5 cards..." : "Paste your content — AI will spread it across all 6 video shots..."}
               style={{ width: "100%", background: "#0a0a0a", border: `1px solid ${ownContent.trim() ? "#d4af37" : "#222"}`, borderRadius: 6, padding: "12px 14px", color: "#ccc", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }} rows={4} />
-            {ownContent.trim() && <div style={{ fontSize: 11, color: "#d4af37", marginTop: 6 }}>✓ Your content will be reformatted into cards. Still pick a topic above.</div>}
+            {ownContent.trim() && <div style={{ fontSize: 11, color: "#d4af37", marginTop: 6 }}>✓ Your content will be reformatted and distributed. Still pick a topic above.</div>}
           </div>
         )}
         <div style={{ fontSize: 10, color: "#2a2a2a", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Suggested</div>
@@ -895,7 +950,7 @@ export default function App() {
     <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
       <div style={{ padding: "48px 20px 60px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <button onClick={() => setScreen("topic")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+          <button onClick={() => setScreen("topic")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
           <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>{selOutput === "cards" ? "🃏 Cards" : `🎬 Style ${selVideoStyle}`}</div>
           <button onClick={() => { setScreen("home"); setCardsData(null); setVideoData(null); }} style={{ background: "none", border: "1px solid #1a1a1a", color: "#444", padding: "5px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer" }}>+ New</button>
         </div>
@@ -952,8 +1007,8 @@ export default function App() {
         {/* VIDEO RESULT */}
         {selOutput === "video" && videoData && (
           <div>
-            <button onClick={() => setShowVideoAnimator(true)} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
-              🎬 Animate & Export Video
+            <button onClick={() => { setVideoAnimatorIdx(0); setShowVideoAnimator(true); }} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
+              🎬 Animate & Edit Video
             </button>
             <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
               <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>TITLE</div>
@@ -965,8 +1020,10 @@ export default function App() {
             </div>
             {videoData.shots?.map((shot, i) => (
               <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, overflow: "hidden", marginBottom: 10 }}>
-                <div style={{ background: "#1a1400", padding: "7px 14px" }}>
+                <div style={{ background: "#1a1400", padding: "7px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                   <span style={{ fontSize: 11, color: "#d4af37", fontWeight: 800, fontFamily: "monospace" }}>{shot.timestamp}</span>
+                  <button onClick={() => { setVideoAnimatorIdx(i); setShowVideoAnimator(true); }}
+                    style={{ padding: "4px 12px", background: "transparent", border: "1px solid #d4af3760", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 3, fontFamily: "inherit" }}>✏ Edit</button>
                 </div>
                 <div style={{ padding: "12px 14px" }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 6 }}>{clean(shot.textOverlay)}</div>
@@ -985,7 +1042,7 @@ export default function App() {
                 {videoData.hashtags?.map((h, i) => <span key={i} style={{ background: "#111", border: "1px solid #1e1e1e", color: "#d4af37", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>)}
               </div>
             </div>
-            <button onClick={() => setShowVideoAnimator(true)} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>🎬 Animate & Export</button>
+            <button onClick={() => { setVideoAnimatorIdx(0); setShowVideoAnimator(true); }} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>🎬 Animate & Export</button>
           </div>
         )}
 
@@ -998,7 +1055,7 @@ export default function App() {
   if (screen === "history") return (
     <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
       <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 28 }}>
-        <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#555", fontSize: 22, cursor: "pointer" }}>←</button>
+        <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
         <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>History</h2>
       </div>
       {history.length === 0 ? <div style={{ textAlign: "center", paddingTop: 60, color: "#222" }}>No content yet</div> : (
