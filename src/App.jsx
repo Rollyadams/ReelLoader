@@ -179,17 +179,12 @@ function SplashScreen({ onNext }) {
 function KeyScreen({ onSave }) {
   const [val, setVal] = useState("");
   const [err, setErr] = useState("");
-  const [testing, setTesting] = useState(false);
 
-  const test = async () => {
-    if (!val.trim()) return setErr("Paste your API key first");
-    setTesting(true); setErr("");
-    try {
-      await callGroq(val.trim(), "Say: OK");
-      onSave(val.trim());
-    } catch (e) {
-      setErr("Invalid key — check and try again");
-    } finally { setTesting(false); }
+  const save = () => {
+    const trimmed = val.trim();
+    if (!trimmed) return setErr("Paste your API key first");
+    if (!trimmed.startsWith("gsk_")) return setErr("Key should start with gsk_ — check and try again");
+    onSave(trimmed);
   };
 
   return (
@@ -203,9 +198,9 @@ function KeyScreen({ onSave }) {
       {err && <div style={{ background: "#1a0000", border: "1px solid #3a0000", color: "#f87171", fontSize: 13, padding: "10px 14px", borderRadius: 8, marginBottom: 16 }}>{err}</div>}
       <textarea value={val} onChange={e => setVal(e.target.value)} placeholder="gsk_..." rows={3}
         style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", color: "#fff", fontSize: 13, resize: "none", outline: "none", marginBottom: 14 }} />
-      <button onClick={test} disabled={testing}
-        style={{ width: "100%", padding: "15px", background: testing ? "#1a1400" : "#d4af37", border: "none", color: testing ? "#d4af37" : "#000", fontSize: 15, fontWeight: 800, borderRadius: 10, cursor: testing ? "not-allowed" : "pointer" }}>
-        {testing ? "Testing..." : "Save & Continue →"}
+      <button onClick={save}
+        style={{ width: "100%", padding: "15px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 800, borderRadius: 10, cursor: "pointer" }}>
+        Save & Continue →
       </button>
     </div>
   );
