@@ -1,1086 +1,567 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback } from "react";
 
-const KEY_STORAGE = "reelloader_v4";
-const HISTORY_STORAGE = "reelloader_history_v4";
-const APP_VERSION = "4.0.0";
+// ── CONFIG ────────────────────────────────────────────────────────────────────
 const MODEL = "llama-3.3-70b-versatile";
-
-const CTA_OPTIONS = [
-  "Save this for later.",
-  "Share with someone who needs this.",
-  "What do you think? Comment below.",
-  "Follow for more tips.",
-  "Tag a friend who should see this.",
-  "Did you learn something new?",
-  "Double-tap if this was helpful.",
-  "Which tip will you try first?",
-  "Drop your questions in the comments.",
-  "Bookmark this post for future reference.",
-  "Agree or disagree? Let us know.",
-  "Send this to your team.",
-  "Want more content like this? Follow us.",
-  "Share your experience below.",
-  "Stay tuned for Part 2.",
-  "What is your biggest challenge with this?",
-  "Rate this tip from 1 to 10.",
-  "Have you tried this before?",
-  "Tell us your thoughts below.",
-  "What is one thing you would add?",
-  "Learn more via the link in bio.",
-  "Join our community today.",
-  "Drop a comment and I will help you.",
-  "Get started now.",
-  "Sign up for updates.",
-];
-
-const clean = (s) => (s || "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/#{1,6}\s/g, "").trim();
+const STORAGE_KEY = "rl_groq_key";
+const HISTORY_KEY = "rl_history";
+const MAX_HISTORY = 30;
 
 const CATEGORIES = [
-  { id: "tech", icon: "⚙️", label: "Tech Concepts", color: "#3b82f6",
-    topics: ["What is an API?", "What is a Webhook?", "How does DNS work?", "What is Cloud Computing?", "What is a Database?", "What is DevOps?", "How does HTTPS work?", "What is Docker?", "What is Kubernetes?", "What is a CDN?"] },
-  { id: "ai", icon: "🤖", label: "AI Explained", color: "#8b5cf6",
-    topics: ["How does ChatGPT work?", "What is Machine Learning?", "What is a Neural Network?", "What is Prompt Engineering?", "How does AI image generation work?", "What is an LLM?", "What is Computer Vision?", "How does voice AI work?", "What is AI training?", "What is a Vector Database?"] },
-  { id: "solar", icon: "⚡", label: "Solar & Energy", color: "#f59e0b",
-    topics: ["How does a solar panel work?", "What is an inverter?", "How do solar batteries work?", "What is a charge controller?", "On-grid vs Off-grid solar", "How to size a solar system", "How AI optimizes solar systems", "What is net metering?", "Why solar panels lose efficiency", "What is a smart grid?"] },
-  { id: "security", icon: "📷", label: "Security & CCTV", color: "#ef4444",
-    topics: ["How does CCTV work?", "Analog vs IP cameras", "What is facial recognition?", "How does motion detection work?", "What is a DVR vs NVR?", "How do smart locks work?", "How does AI CCTV work?", "What is cyber security?", "What is two-factor authentication?", "How does a firewall work?"] },
-  { id: "biztech", icon: "💼", label: "Business Tech", color: "#10b981",
-    topics: ["What is SaaS?", "How does online payment work?", "What is business automation?", "What is CRM software?", "How does e-commerce work?", "What is a payment gateway?", "How does digital marketing work?", "What is a mobile app vs web app?", "How does data backup work?", "What is ERP software?"] },
+  { id: "tech",     label: "Tech Education",     icon: "⚡" },
+  { id: "startup",  label: "Startup & Business",  icon: "🚀" },
+  { id: "career",   label: "Career & Growth",     icon: "📈" },
+  { id: "finance",  label: "Money & Finance",     icon: "💰" },
+  { id: "lifestyle",label: "Lifestyle & Mindset", icon: "🧠" },
+  { id: "nigeria",  label: "Nigeria & Africa",    icon: "🌍" },
 ];
 
-// ─── GROQ ─────────────────────────────────────────────────────────────────────
-async function groq(prompt, isArray = false) {
-  const key = localStorage.getItem(KEY_STORAGE);
-  if (!key) throw new Error("No API key. Tap ⚙ to add your Groq key.");
+const PLATFORMS = [
+  { id: "instagram", label: "Instagram", icon: "📸", hint: "Carousel + Caption" },
+  { id: "twitter",   label: "X / Twitter", icon: "𝕏", hint: "Thread" },
+  { id: "tiktok",    label: "TikTok", icon: "🎵", hint: "Script + Caption" },
+  { id: "linkedin",  label: "LinkedIn", icon: "💼", hint: "Post + Hashtags" },
+];
+
+const CTA_LIBRARY = [
+  "Save this for later.",
+  "Share with someone who needs this.",
+  "Follow for more tips like this.",
+  "Tag a friend who should see this.",
+  "What do you think? Drop it in the comments.",
+  "Drop your questions below — I'll answer every one.",
+  "Which tip will you try first?",
+  "Agree or disagree? Let us know.",
+  "Did you learn something new? Double-tap.",
+  "Want more content like this? Follow us.",
+  "Bookmark this post for future reference.",
+  "Share your experience below.",
+  "What's your biggest challenge with this?",
+  "Rate this from 1–10 in the comments.",
+  "Have you tried this before?",
+];
+
+// ── GROQ ──────────────────────────────────────────────────────────────────────
+async function callGroq(key, prompt) {
   const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
-    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${key}` },
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: MODEL, max_tokens: 2500, temperature: 0.6,
-      messages: [
-        { role: "system", content: "You are a JSON API. Return ONLY raw valid JSON — no markdown, no backticks, no asterisks inside string values, no bold, no italic, no explanation. Plain text in all string values. NEVER include brand names, company names, or website URLs inside shot voiceover or textOverlay fields." },
-        { role: "user", content: prompt }
-      ]
-    })
+      model: MODEL, max_tokens: 3000, temperature: 0.7,
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error?.message || `HTTP ${res.status}`);
-  let text = (data.choices?.[0]?.message?.content || "").replace(/```json|```/gi, "").trim();
-  const o = isArray ? "[" : "{", c = isArray ? "]" : "}";
-  const si = text.indexOf(o), ei = text.lastIndexOf(c) + 1;
-  if (si === -1) throw new Error("Invalid response. Please try again.");
-  let parsed;
-  try { parsed = JSON.parse(text.slice(si, ei)); }
-  catch { parsed = JSON.parse(text.slice(si, ei).replace(/\*\*(.*?)\*\*/g, "$1").replace(/\*(.*?)\*/g, "$1").replace(/,\s*([}\]])/g, "$1").replace(/[\u0000-\u001F]/g, " ")); }
-  if (!parsed) return parsed;
-  // Force-clean brand from last video shot
-  if (Array.isArray(parsed?.shots) && parsed.shots.length > 0) {
-    const last = parsed.shots[parsed.shots.length - 1];
-    const nb = (s) => (s||"").replace(/rollyadams[\w\s]*?(nigeria)?/gi,"").replace(/rollyadamstechworld\.com\.ng/gi,"").replace(/\s{2,}/g," ").trim();
-    last.voiceover = nb(last.voiceover);
-    last.textOverlay = nb(last.textOverlay);
-    last.visual = nb(last.visual);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `API error ${res.status}`);
   }
-  return parsed;
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || "";
+  const si = text.indexOf("{"); const ei = text.lastIndexOf("}") + 1;
+  if (si === -1) throw new Error("No JSON in response");
+  try { return JSON.parse(text.slice(si, ei)); }
+  catch { return JSON.parse(text.slice(si, ei).replace(/,\s*([}\]])/g, "$1").replace(/[\u0000-\u001F]/g, " ")); }
 }
 
-// ─── PROMPTS ──────────────────────────────────────────────────────────────────
-function cardsPrompt(topic, catLabel, ownContent = "") {
-  const contentInstruction = ownContent.trim()
-    ? `\n\nSOURCE CONTENT TO REFORMAT (do not invent — use only what is below):\n"""\n${ownContent.trim()}\n"""\n\nSplit this content into exactly 5 distinct points or ideas — one idea per card body. Each card must cover a DIFFERENT part of the source content. Do NOT put all the content in card 1 only.`
-    : "";
-  return `Create 5 Instagram carousel cards explaining: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.${contentInstruction}
-
-RULES — plain text only, no markdown, no asterisks:
-- Hook card: shocking question or fact, max 10 words
-- Each card body: MAX 15 WORDS using analogy or contrast, never a definition
-- Headlines: 2-4 words
-- CTA: simple warm engagement ask — like, share, follow. No brand mention. Max 15 words.
-
-GOOD body example: "The waiter between your app and the kitchen. You order. It delivers."
-BAD body example: "An API is an interface that enables software systems to communicate."
-
-Return ONLY this JSON:
-{"hookCard":"max 10 word hook","cards":[{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"},{"headline":"2-4 words","body":"max 15 word analogy"}],"ctaCard":"simple engagement CTA like: If you found this helpful, like and share. Max 15 words.","caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
-}
-
-function videoPrompt(topic, catLabel, style, ownContent = "") {
-  const styleGuide = style === "A"
-    ? "Style A: Text-only animation. Bold words appear/fade on black. Like motivational reels. Each shot: 1 powerful sentence or phrase. Short, punchy, rhythm-driven."
-    : "Style B: Educational slides. Each shot has a headline, explanation, and visual direction. Like explainer videos. Clear, informative, builds understanding.";
-
-  const contentInstruction = ownContent.trim()
-    ? `\n\nSOURCE CONTENT (reformat into the 6 shots below — do not invent. Spread content across ALL 6 shots, each shot covering a DIFFERENT part of the source):\n"""\n${ownContent.trim()}\n"""`
+// ── PROMPT ────────────────────────────────────────────────────────────────────
+function buildPrompt(topic, catLabel, platforms, cta, ownContent) {
+  const hasPlatform = (id) => platforms.includes(id);
+  const contentNote = ownContent?.trim()
+    ? `\n\nSOURCE CONTENT — rewrite and adapt this into all formats below. Do not copy verbatim, improve it:\n"""\n${ownContent.trim()}\n"""`
     : "";
 
-  return `Write a 60-second educational video script about: "${topic}" (${catLabel}) for Rollyadams Techworld Nigeria.${contentInstruction}
+  return `You are a top-tier social media content strategist for Rollyadams Techworld Nigeria.
+Create a complete content pack about: "${topic}" (${catLabel}).${contentNote}
 
-${styleGuide}
+Audience: Nigerian tech professionals, students, entrepreneurs aged 18–35.
+Tone: Sharp, direct, relatable. No corporate fluff. Nigerian English is fine where natural.
+Voice: Confident authority — like someone who's done this, not read about it.
 
-Plain text only in all fields — no markdown, no asterisks, no bold formatting.
+CTA to use: "${cta}"
 
-6 shots total. Each shot is 8-12 seconds.
-Shot 1: Hook — most shocking or interesting fact
-Shot 2: Why it matters to the viewer
-Shot 3: Core concept explained simply
-Shot 4: Real-world example
-Shot 5: Key insight or takeaway
-Shot 6: Simple closing line only. Example voiceover: "If you found this helpful, like and share." Example textOverlay: "Like. Share. Follow." NO brand names, NO company names, NO website URLs in shot 6.
-
-Return ONLY this JSON:
-{"title":"plain video title","audioVibe":"music description","keyTakeaway":"one sentence","shots":[{"timestamp":"00:00-00:10","textOverlay":"2-5 bold words for screen","voiceover":"what to say out loud","visual":"what to show or animate"},{"timestamp":"00:10-00:20","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:20-00:30","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:30-00:40","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:40-00:50","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"},{"timestamp":"00:50-01:00","textOverlay":"2-5 bold words","voiceover":"spoken sentence","visual":"visual direction"}],"caption":"caption under 150 chars","hashtags":["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]}`;
+Return ONLY valid JSON, no markdown, no extra text:
+{
+  "hook": "One sentence. Curiosity-gap or shocking fact. Max 15 words. No question marks — statements hit harder.",
+  "carousel": [
+    {"slide": 1, "headline": "2-4 words MAX", "body": "Max 20 words. Analogy or contrast. Never a definition. Never start with The/An/A."},
+    {"slide": 2, "headline": "2-4 words MAX", "body": "Max 20 words. Different angle from slide 1."},
+    {"slide": 3, "headline": "2-4 words MAX", "body": "Max 20 words. Real-world example or stat."},
+    {"slide": 4, "headline": "2-4 words MAX", "body": "Max 20 words. Insight most people miss."},
+    {"slide": 5, "headline": "2-4 words MAX", "body": "Max 20 words. Practical takeaway."}
+  ],
+  "hook_card": "Max 10 words. Punchy opener for slide 1 of carousel.",
+  "cta_card": "${cta}",${hasPlatform("twitter") ? `
+  "thread": [
+    "Tweet 1: Hook — rewrite the hook as a tweet. No hashtags here.",
+    "Tweet 2: The problem most people don't see.",
+    "Tweet 3: The insight.",
+    "Tweet 4: The example.",
+    "Tweet 5: Takeaway + CTA"
+  ],` : `"thread": [],`}${hasPlatform("tiktok") ? `
+  "tiktok_script": {
+    "hook_line": "First 3 seconds — what you say to stop the scroll. Max 10 words.",
+    "body": "What you say from seconds 3–30. Conversational, punchy. 60–80 words.",
+    "outro": "Last 5 seconds. CTA spoken out loud. Max 10 words."
+  },` : `"tiktok_script": null,`}${hasPlatform("linkedin") ? `
+  "linkedin_post": "Full LinkedIn post. Professional but not boring. 100–150 words. Paragraph breaks. End with CTA.",` : `"linkedin_post": null,`}
+  "caption": "Universal caption under 120 chars. Works on any platform.",
+  "hashtags": ["#tag1","#tag2","#tag3","#tag4","#tag5","#tag6","#tag7","#tag8"]
+}`;
 }
 
-// ─── UI HELPERS ───────────────────────────────────────────────────────────────
-function CopyBtn({ text }) {
-  const [c, setC] = useState(false);
-  return <button onClick={() => { navigator.clipboard?.writeText(text); setC(true); setTimeout(() => setC(false), 2000); }} style={{ padding: "5px 12px", borderRadius: 4, border: `1px solid ${c ? "#d4af37" : "#2a2a2a"}`, background: c ? "#1a1400" : "transparent", color: c ? "#d4af37" : "#555", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>{c ? "✓" : "Copy"}</button>;
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function saveHistory(pack) {
+  try {
+    const existing = JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+    const updated = [pack, ...existing].slice(0, MAX_HISTORY);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+  } catch {}
 }
 
-function Spinner({ msg }) {
+function loadHistory() {
+  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); }
+  catch { return []; }
+}
+
+// ── UI ATOMS ──────────────────────────────────────────────────────────────────
+function CopyBtn({ text, label = "Copy" }) {
+  const [copied, setCopied] = useState(false);
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.97)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", zIndex: 999, gap: 20 }}>
-      <div style={{ width: 44, height: 44, border: "3px solid #1a1400", borderTop: "3px solid #d4af37", borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
-      <div style={{ color: "#d4af37", fontSize: 14, fontWeight: 700, textAlign: "center", maxWidth: 240, lineHeight: 1.6 }}>{msg}</div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800;900&display=swap');`}</style>
+    <button onClick={() => { navigator.clipboard?.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); }}
+      style={{ padding: "6px 14px", background: copied ? "#1a2e1a" : "#111", border: `1px solid ${copied ? "#2d5a2d" : "#222"}`, color: copied ? "#4ade80" : "#666", borderRadius: 6, fontSize: 12, fontWeight: 600, cursor: "pointer", transition: "all 0.2s", flexShrink: 0 }}>
+      {copied ? "✓ Copied" : label}
+    </button>
+  );
+}
+
+function Badge({ children, color = "#d4af37" }) {
+  return <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color, textTransform: "uppercase" }}>{children}</span>;
+}
+
+function Section({ label, color, children, copyText }) {
+  return (
+    <div style={{ background: "#0a0a0a", border: "1px solid #161616", borderRadius: 12, overflow: "hidden", marginBottom: 12 }}>
+      <div style={{ padding: "10px 16px", borderBottom: "1px solid #111", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Badge color={color}>{label}</Badge>
+        {copyText && <CopyBtn text={copyText} />}
+      </div>
+      <div style={{ padding: "14px 16px" }}>{children}</div>
     </div>
   );
 }
 
-const S = { fontFamily: "'Space Grotesk','Segoe UI',sans-serif" };
-
-// ─── CARD SLIDE ───────────────────────────────────────────────────────────────
-function CardSlide({ headline, body, num, total, isHook, isCta, topic }) {
+function Pill({ children, active, onClick, color = "#d4af37" }) {
   return (
-    <div style={{ width: "100%", aspectRatio: "1/1", background: "#000", borderRadius: 16, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "28px 26px", boxSizing: "border-box", position: "relative", overflow: "hidden", border: "1px solid #1a1a1a" }}>
-      <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "radial-gradient(circle,#d4af3712 0%,transparent 70%)", pointerEvents: "none" }} />
-      {/* Top */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase" }}>ReelLoader</span>
-        <span style={{ fontSize: 10, color: "#2a2a2a" }}>{isHook ? "●●●●●●●" : isCta ? "✦" : `${num}/${total}`}</span>
+    <button onClick={onClick} style={{ padding: "8px 16px", background: active ? "#1a1400" : "#080808", border: `1px solid ${active ? color : "#1a1a1a"}`, color: active ? color : "#444", borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all 0.2s", whiteSpace: "nowrap" }}>
+      {children}
+    </button>
+  );
+}
+
+// ── SCREENS ───────────────────────────────────────────────────────────────────
+
+// SPLASH
+function SplashScreen({ onNext }) {
+  return (
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 28px", gap: 0 }}>
+      <div style={{ fontSize: 48, marginBottom: 20 }}>⚡</div>
+      <div style={{ fontSize: 28, fontWeight: 900, color: "#fff", letterSpacing: -1, marginBottom: 8, textAlign: "center" }}>ReelLoader</div>
+      <div style={{ fontSize: 14, color: "#333", textAlign: "center", lineHeight: 1.6, marginBottom: 48 }}>
+        Topic in. Full content pack out.<br />Built for Rollyadams Techworld Nigeria.
       </div>
-      {/* Content */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "16px 0" }}>
-        {isHook ? (
-          <>
-            <div style={{ fontSize: 10, color: "#555", letterSpacing: 3, textTransform: "uppercase", marginBottom: 14 }}>Did you know?</div>
-            <div style={{ fontSize: 26, fontWeight: 900, color: "#fff", lineHeight: 1.25 }}>{clean(headline)}</div>
-          </>
-        ) : isCta ? (
-          <>
-            <div style={{ width: 36, height: 3, background: "#d4af37", borderRadius: 2, marginBottom: 18 }} />
-            <div style={{ fontSize: 20, fontWeight: 900, color: "#fff", lineHeight: 1.3, marginBottom: 12 }}>{clean(headline)}</div>
-            {body && <div style={{ fontSize: 12, color: "#666" }}>{clean(body)}</div>}
-          </>
-        ) : (
-          <>
-            <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", marginBottom: 12 }}>{clean(headline)}</div>
-            <div style={{ width: 28, height: 2, background: "#d4af37", opacity: 0.3, borderRadius: 1, marginBottom: 18 }} />
-            <div style={{ fontSize: 24, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>{clean(body)}</div>
-          </>
-        )}
-      </div>
-      {/* Bottom */}
-      <div style={{ display: "flex", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 9, color: "#2a2a2a" }}>rollyadamstechworld.com.ng</span>
-        <span style={{ fontSize: 9, color: "#2a2a2a" }}>@rollyadamstechworld</span>
-      </div>
+      <button onClick={onNext} style={{ width: "100%", maxWidth: 320, padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 800, borderRadius: 10, cursor: "pointer" }}>
+        Get Started →
+      </button>
     </div>
   );
 }
 
-// ─── CARDS VIEWER ─────────────────────────────────────────────────────────────
-function CardsViewer({ data, topic, initialIdx = 0, onClose }) {
-  const [idx, setIdx] = useState(initialIdx);
-  const [view, setView] = useState("cards"); // cards | edit | cta
-  const [editData, setEditData] = useState({
-    hookCard: data.hookCard || "",
-    cards: (data.cards || []).map(c => ({ ...c })),
-    ctaCard: data.ctaCard || "",
-    caption: data.caption || "",
-    hashtags: data.hashtags || [],
-  });
-  const touchX = useRef(null);
+// API KEY
+function KeyScreen({ onSave }) {
+  const [val, setVal] = useState("");
+  const [err, setErr] = useState("");
+  const [testing, setTesting] = useState(false);
 
-  const allCards = [
-    { isHook: true, headline: editData.hookCard },
-    ...editData.cards.map((c, i) => ({ headline: c.headline, body: c.body, num: i + 1, total: editData.cards.length })),
-    { isCta: true, headline: editData.ctaCard },
-  ];
-
-  const onTouchStart = e => { touchX.current = e.touches[0].clientX; };
-  const onTouchEnd = e => {
-    if (!touchX.current) return;
-    const d = touchX.current - e.changedTouches[0].clientX;
-    if (d > 50 && idx < allCards.length - 1) setIdx(i => i + 1);
-    if (d < -50 && idx > 0) setIdx(i => i - 1);
-    touchX.current = null;
+  const test = async () => {
+    if (!val.trim()) return setErr("Paste your API key first");
+    setTesting(true); setErr("");
+    try {
+      await callGroq(val.trim(), "Say: OK");
+      onSave(val.trim());
+    } catch (e) {
+      setErr("Invalid key — check and try again");
+    } finally { setTesting(false); }
   };
 
-  const SS = { fontFamily: "'Space Grotesk',sans-serif" };
-
-  // ── CTA PICKER SCREEN
-  if (view === "cta") return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={() => setView("edit")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700 }}>Pick a CTA</div>
-        <div style={{ width: 30 }} />
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "12px 16px" }}>
-        {CTA_OPTIONS.map((cta, i) => (
-          <button key={i} onClick={() => { setEditData(d => ({ ...d, ctaCard: cta })); setView("edit"); }}
-            style={{ width: "100%", padding: "14px 16px", background: editData.ctaCard === cta ? "#1a1400" : "#0a0a0a", border: `1px solid ${editData.ctaCard === cta ? "#d4af37" : "#1a1a1a"}`, borderRadius: 8, color: editData.ctaCard === cta ? "#d4af37" : "#888", fontSize: 14, fontWeight: 600, cursor: "pointer", textAlign: "left", marginBottom: 8, fontFamily: "inherit" }}>
-            {cta}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
-  // ── EDIT SCREEN
-  if (view === "edit") return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={() => setView("cards")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>
-          {idx === 0 ? "Edit Hook" : idx === allCards.length - 1 ? "Edit CTA" : `Edit Card ${idx}`}
-        </div>
-        <button onClick={() => setView("cards")} style={{ padding: "7px 16px", background: "#d4af37", border: "none", color: "#000", fontSize: 13, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done ✓</button>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px" }}>
-        {idx === 0 && (
-          <div>
-            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Hook Card Text</div>
-            <textarea value={editData.hookCard} onChange={e => setEditData(d => ({ ...d, hookCard: e.target.value }))}
-              placeholder="Type your hook question or fact..."
-              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={5} />
-          </div>
-        )}
-
-        {idx > 0 && idx < allCards.length - 1 && (
-          <div>
-            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Headline</div>
-            <textarea value={editData.cards[idx - 1]?.headline || ""}
-              onChange={e => { const c = editData.cards.map((x, i) => i === idx - 1 ? { ...x, headline: e.target.value } : x); setEditData(d => ({ ...d, cards: c })); }}
-              placeholder="Short headline (2-4 words)..."
-              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#d4af37", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 20 }} rows={2} />
-            <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Body Text</div>
-            <textarea value={editData.cards[idx - 1]?.body || ""}
-              onChange={e => { const c = editData.cards.map((x, i) => i === idx - 1 ? { ...x, body: e.target.value } : x); setEditData(d => ({ ...d, cards: c })); }}
-              placeholder="Paste or type your content here..."
-              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={6} />
-          </div>
-        )}
-
-        {idx === allCards.length - 1 && (
-          <div>
-            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>CTA Text</div>
-            <textarea value={editData.ctaCard}
-              onChange={e => setEditData(d => ({ ...d, ctaCard: e.target.value }))}
-              placeholder="Your call to action..."
-              style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "14px", color: "#fff", fontSize: 16, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 16, lineHeight: 1.5 }} rows={3} />
-            <button onClick={() => setView("cta")}
-              style={{ width: "100%", padding: "14px", background: "#0a0a0a", border: "2px solid #d4af37", color: "#d4af37", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 8, marginBottom: 20 }}>
-              🎯 Pick from CTA Library (25 options)
-            </button>
-          </div>
-        )}
-
-        <div style={{ marginTop: 8 }}>
-          <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Caption</div>
-          <textarea value={editData.caption} onChange={e => setEditData(d => ({ ...d, caption: e.target.value }))}
-            style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px", color: "#888", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box" }} rows={3} />
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── MAIN CARDS VIEW
-  const card = allCards[idx];
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
-      {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={onClose} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{idx + 1} / {allCards.length}</div>
-        <button onClick={() => setView("edit")} style={{ padding: "7px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
+    <div style={{ minHeight: "100dvh", padding: "60px 24px 40px" }}>
+      <div style={{ fontSize: 22, fontWeight: 800, marginBottom: 8 }}>Connect Groq</div>
+      <div style={{ fontSize: 13, color: "#444", marginBottom: 8, lineHeight: 1.7 }}>
+        Free at <span style={{ color: "#d4af37" }}>console.groq.com</span><br />
+        Sign up → API Keys → Create → Paste below
       </div>
+      <div style={{ fontSize: 11, color: "#2a2a2a", marginBottom: 24 }}>Key is stored only on this device.</div>
+      {err && <div style={{ background: "#1a0000", border: "1px solid #3a0000", color: "#f87171", fontSize: 13, padding: "10px 14px", borderRadius: 8, marginBottom: 16 }}>{err}</div>}
+      <textarea value={val} onChange={e => setVal(e.target.value)} placeholder="gsk_..." rows={3}
+        style={{ width: "100%", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", color: "#fff", fontSize: 13, resize: "none", outline: "none", marginBottom: 14 }} />
+      <button onClick={test} disabled={testing}
+        style={{ width: "100%", padding: "15px", background: testing ? "#1a1400" : "#d4af37", border: "none", color: testing ? "#d4af37" : "#000", fontSize: 15, fontWeight: 800, borderRadius: 10, cursor: testing ? "not-allowed" : "pointer" }}>
+        {testing ? "Testing..." : "Save & Continue →"}
+      </button>
+    </div>
+  );
+}
 
-      {/* Card display */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px 20px", userSelect: "none" }}
-        onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div style={{ width: "100%", maxWidth: 380 }}>
-          <CardSlide {...card} topic={topic} />
+// HOME — category + platform + topic + optional own content + CTA picker
+function HomeScreen({ onGenerate, onHistory, historyCount }) {
+  const [cat, setCat] = useState("tech");
+  const [platforms, setPlatforms] = useState(["instagram", "twitter"]);
+  const [topic, setTopic] = useState("");
+  const [ownContent, setOwnContent] = useState("");
+  const [showOwn, setShowOwn] = useState(false);
+  const [cta, setCta] = useState(CTA_LIBRARY[0]);
+  const [showCta, setShowCta] = useState(false);
+
+  const togglePlatform = (id) => setPlatforms(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+  const canGo = topic.trim().length > 0 && platforms.length > 0;
+
+  return (
+    <div style={{ minHeight: "100dvh", padding: "0 0 40px" }}>
+      {/* Header */}
+      <div style={{ padding: "52px 24px 20px", borderBottom: "1px solid #0d0d0d" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 900, letterSpacing: -0.5 }}>ReelLoader</div>
+            <div style={{ fontSize: 12, color: "#2a2a2a", marginTop: 2 }}>Content engine · Rollyadams TW Nigeria</div>
+          </div>
+          <button onClick={onHistory} style={{ background: "none", border: "1px solid #1a1a1a", color: "#444", padding: "8px 14px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            History {historyCount > 0 && <span style={{ color: "#d4af37" }}>{historyCount}</span>}
+          </button>
         </div>
       </div>
 
-      {/* Bottom nav */}
-      <div style={{ padding: "10px 20px 32px", flexShrink: 0 }}>
-        {/* Progress dots */}
-        <div style={{ display: "flex", justifyContent: "center", gap: 5, marginBottom: 14 }}>
-          {allCards.map((_, i) => (
-            <div key={i} onClick={() => setIdx(i)}
-              style={{ width: i === idx ? 20 : 6, height: 6, borderRadius: 3, background: i === idx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />
+      <div style={{ padding: "24px" }}>
+        {/* Category */}
+        <div style={{ fontSize: 10, color: "#333", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Category</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 24 }}>
+          {CATEGORIES.map(c => (
+            <button key={c.id} onClick={() => setCat(c.id)}
+              style={{ padding: "12px 14px", background: cat === c.id ? "#1a1400" : "#080808", border: `1px solid ${cat === c.id ? "#d4af37" : "#141414"}`, borderRadius: 10, color: cat === c.id ? "#d4af37" : "#333", fontSize: 13, fontWeight: 600, cursor: "pointer", textAlign: "left", transition: "all 0.2s" }}>
+              <span style={{ marginRight: 6 }}>{c.icon}</span>{c.label}
+            </button>
           ))}
         </div>
 
-        {/* Prev / Edit / Next */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 10 }}>
-          <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={idx === 0}
-            style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: idx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: idx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev</button>
-          <button onClick={() => setView("edit")}
-            style={{ padding: "13px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
-          <button onClick={() => setIdx(i => Math.min(allCards.length - 1, i + 1))} disabled={idx === allCards.length - 1}
-            style={{ padding: "13px", background: idx === allCards.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${idx === allCards.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: idx === allCards.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: idx === allCards.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next →</button>
+        {/* Platforms */}
+        <div style={{ fontSize: 10, color: "#333", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Platforms</div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+          {PLATFORMS.map(p => (
+            <Pill key={p.id} active={platforms.includes(p.id)} onClick={() => togglePlatform(p.id)}>
+              {p.icon} {p.label}
+            </Pill>
+          ))}
         </div>
 
-        {/* CTA shortcut on last card */}
-        {idx === allCards.length - 1 && (
-          <button onClick={() => setView("cta")}
-            style={{ width: "100%", padding: "12px", background: "#0a0a0a", border: "1px solid #d4af3750", color: "#d4af37", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, marginBottom: 10 }}>
-            🎯 Change CTA
-          </button>
+        {/* Topic */}
+        <div style={{ fontSize: 10, color: "#333", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Topic</div>
+        <input value={topic} onChange={e => setTopic(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && canGo && onGenerate({ cat, platforms, topic: topic.trim(), ownContent, cta })}
+          placeholder="e.g. What is an API, Why startups fail, How to invest at 25..."
+          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #161616", borderRadius: 10, padding: "14px 16px", color: "#fff", fontSize: 14, outline: "none", marginBottom: 12 }} />
+
+        {/* Own content toggle */}
+        <button onClick={() => setShowOwn(s => !s)}
+          style={{ background: "none", border: "none", color: showOwn ? "#d4af37" : "#2a2a2a", fontSize: 12, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: showOwn ? 10 : 20 }}>
+          {showOwn ? "▾ Hide" : "▸ Paste your own content (optional)"}
+        </button>
+        {showOwn && (
+          <textarea value={ownContent} onChange={e => setOwnContent(e.target.value)}
+            placeholder="Paste your existing content — AI will rewrite and adapt it across all formats..."
+            rows={5} style={{ width: "100%", background: "#0a0a0a", border: `1px solid ${ownContent.trim() ? "#d4af3760" : "#161616"}`, borderRadius: 10, padding: "12px 14px", color: "#ccc", fontSize: 13, resize: "none", outline: "none", marginBottom: 20, lineHeight: 1.6 }} />
         )}
 
-        {/* Caption copy */}
-        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 12, color: "#555", flex: 1, marginRight: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{editData.caption}</div>
-          <CopyBtn text={`${editData.caption}
+        {/* CTA Picker */}
+        <div style={{ fontSize: 10, color: "#333", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Call to Action</div>
+        <button onClick={() => setShowCta(s => !s)}
+          style={{ width: "100%", padding: "12px 16px", background: "#0a0a0a", border: "1px solid #161616", borderRadius: 10, color: "#888", fontSize: 13, cursor: "pointer", textAlign: "left", marginBottom: showCta ? 10 : 20, display: "flex", justifyContent: "space-between" }}>
+          <span style={{ color: "#d4af37", flex: 1, marginRight: 8 }}>{cta}</span>
+          <span style={{ color: "#333" }}>{showCta ? "▲" : "▼"}</span>
+        </button>
+        {showCta && (
+          <div style={{ background: "#080808", border: "1px solid #161616", borderRadius: 10, overflow: "hidden", marginBottom: 20 }}>
+            {CTA_LIBRARY.map((c, i) => (
+              <button key={i} onClick={() => { setCta(c); setShowCta(false); }}
+                style={{ width: "100%", padding: "12px 16px", background: c === cta ? "#1a1400" : "transparent", border: "none", borderBottom: i < CTA_LIBRARY.length - 1 ? "1px solid #0d0d0d" : "none", color: c === cta ? "#d4af37" : "#555", fontSize: 13, cursor: "pointer", textAlign: "left", fontFamily: "inherit" }}>
+                {c}
+              </button>
+            ))}
+          </div>
+        )}
 
-${editData.hashtags?.join(" ")}`} />
-        </div>
+        {/* Generate */}
+        <button onClick={() => canGo && onGenerate({ cat, platforms, topic: topic.trim(), ownContent, cta })}
+          disabled={!canGo}
+          style={{ width: "100%", padding: "16px", background: canGo ? "#d4af37" : "#0d0d0d", border: "none", color: canGo ? "#000" : "#1a1a1a", fontSize: 16, fontWeight: 900, borderRadius: 12, cursor: canGo ? "pointer" : "not-allowed", transition: "all 0.2s", letterSpacing: -0.3 }}>
+          Generate Content Pack →
+        </button>
       </div>
     </div>
   );
 }
 
-// ─── VIDEO ANIMATOR ───────────────────────────────────────────────────────────
-function VideoAnimator({ data, style, initialShotIdx = 0, onClose }) {
-  const [phase, setPhase] = useState("ready");
-  const [view, setView] = useState(initialShotIdx > 0 ? "edit" : "player");
-  const [shotIdx, setShotIdx] = useState(initialShotIdx);
-  const [visible, setVisible] = useState(true);
-  const [wordIdx, setWordIdx] = useState(-1); // -1 = show all words
-  const [videoURL, setVideoURL] = useState("");
-  const [exportProgress, setExportProgress] = useState(0);
-  const [editShots, setEditShots] = useState(() => (data.shots || []).map(s => ({ ...s })));
-  const canvasRef = useRef(null);
-  const recorderRef = useRef(null);
-  const chunksRef = useRef([]);
-  const shots = editShots;
-  const touchX = useRef(null);
-
-  // Kill speech on unmount
-  useEffect(() => {
-    return () => {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.cancel();
-    };
-  }, []);
-
-  // Kill speech whenever phase leaves "playing"
-  useEffect(() => {
-    if (phase !== "playing") {
-      window.speechSynthesis.cancel();
-    }
-  }, [phase]);
-
-  const updateShot = (i, field, val) => {
-    setEditShots(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: val } : s));
-  };
-
-  const speak = (text, onEnd) => {
-    window.speechSynthesis.cancel();
-    const utt = new SpeechSynthesisUtterance(clean(text));
-    utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
-    const voices = window.speechSynthesis.getVoices();
-    const v = voices.find(v => v.name.includes("David") && v.lang.startsWith("en"))
-      || voices.find(v => v.name.includes("James") && v.lang.startsWith("en"))
-      || voices.find(v => v.name.includes("Daniel") && v.lang.startsWith("en"))
-      || voices.find(v => v.name.includes("Male") && v.lang.startsWith("en"))
-      || voices.find(v => v.lang === "en-GB")
-      || voices.find(v => v.lang.startsWith("en"))
-      || voices[0];
-    if (v) utt.voice = v;
-    utt.onend = onEnd; utt.onerror = onEnd;
-    window.speechSynthesis.speak(utt);
-  };
-
-  // Manual browse
-  const onTouchStart = e => { touchX.current = e.touches[0].clientX; };
-  const onTouchEnd = e => {
-    if (!touchX.current) return;
-    const d = touchX.current - e.changedTouches[0].clientX;
-    if (d > 50 && shotIdx < shots.length - 1) setShotIdx(i => i + 1);
-    if (d < -50 && shotIdx > 0) setShotIdx(i => i - 1);
-    touchX.current = null;
-  };
-
-  // Play preview
-  const isPlayingRef = useRef(false);
-
-  const playPreview = useCallback(() => {
-    setPhase("playing"); setShotIdx(0); setWordIdx(0);
-    isPlayingRef.current = true;
-    let i = 0;
-    const next = () => {
-      if (!isPlayingRef.current || i >= shots.length) {
-        isPlayingRef.current = false;
-        setPhase("ready"); setShotIdx(0); setWordIdx(-1);
-        window.speechSynthesis.cancel();
-        return;
-      }
-      setVisible(false);
-      setTimeout(() => {
-        if (!isPlayingRef.current) return;
-        setShotIdx(i);
-        setVisible(true);
-        const words = clean(shots[i].voiceover).split(" ");
-        let wIdx = 0;
-        setWordIdx(0);
-        const msPerWord = Math.max(180, Math.min(380, (shots[i].voiceover.length / words.length) * 80));
-        const wordTimer = setInterval(() => {
-          if (!isPlayingRef.current) { clearInterval(wordTimer); return; }
-          wIdx++;
-          if (wIdx >= words.length) { clearInterval(wordTimer); setWordIdx(-1); }
-          else setWordIdx(wIdx);
-        }, msPerWord);
-        speak(shots[i].voiceover, () => {
-          clearInterval(wordTimer);
-          setWordIdx(-1);
-          i++;
-          setTimeout(() => {
-            if (isPlayingRef.current) next();
-          }, 400);
-        });
-      }, 150);
-    };
-    next();
-  }, [shots]);
-
-  // Canvas export
-  const drawShotOnCanvas = (canvas, shot, videoStyle) => {
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width, H = canvas.height;
-    ctx.fillStyle = "#000"; ctx.fillRect(0, 0, W, H);
-
-    if (videoStyle === "A") {
-      const words = clean(shot.textOverlay).toUpperCase().split(" ");
-      const fontSize = Math.floor(W * 0.09);
-      ctx.font = `900 ${fontSize}px sans-serif`;
-      ctx.textAlign = "center";
-      const lineH = Math.floor(fontSize * 1.15);
-      const totalH = words.length * lineH;
-      const startY = H / 2 - totalH / 2 + fontSize * 0.8;
-      words.forEach((w, wi) => {
-        ctx.fillStyle = wi % 2 === 0 ? "#ffffff" : "#d4af37";
-        ctx.fillText(w, W / 2, startY + wi * lineH);
-      });
-    } else {
-      ctx.fillStyle = "#d4af37";
-      ctx.font = `bold ${Math.floor(W * 0.055)}px Space Grotesk, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText(clean(shot.textOverlay), W / 2, H * 0.3);
-      ctx.fillStyle = "rgba(212,175,55,0.3)";
-      ctx.fillRect(W * 0.1, H * 0.35, W * 0.8, 2);
-      ctx.fillStyle = "#cccccc";
-      ctx.font = `${Math.floor(W * 0.038)}px Space Grotesk, sans-serif`;
-      const words = clean(shot.voiceover).split(" ");
-      let line = "", lines = [], maxW = W * 0.8;
-      for (const w of words) { const t = line + w + " "; if (ctx.measureText(t).width > maxW && line) { lines.push(line.trim()); line = w + " "; } else line = t; }
-      if (line) lines.push(line.trim());
-      lines.slice(0, 3).forEach((l, li) => ctx.fillText(l, W / 2, H * 0.45 + li * Math.floor(W * 0.05)));
-    }
-
-    ctx.fillStyle = "#2a2a2a";
-    ctx.font = `${Math.floor(W * 0.025)}px Space Grotesk, sans-serif`;
-    ctx.textAlign = "left"; ctx.fillText("rollyadamstechworld.com.ng", W * 0.05, H * 0.95);
-    ctx.textAlign = "right"; ctx.fillText("@rollyadamstechworld", W * 0.95, H * 0.95);
-    ctx.fillStyle = "#333";
-    ctx.font = `${Math.floor(W * 0.028)}px monospace`;
-    ctx.textAlign = "center"; ctx.fillText(shot.timestamp, W / 2, H * 0.05);
-  };
-
-  const exportVideo = useCallback(async () => {
-    if (!canvasRef.current) return;
-    setPhase("recording"); setExportProgress(0);
-    const canvas = canvasRef.current;
-    canvas.width = 720; canvas.height = 1280;
-    const stream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
-    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 3000000 });
-    chunksRef.current = [];
-    recorder.ondataavailable = e => { if (e.data.size > 0) chunksRef.current.push(e.data); };
-    recorder.start(100);
-    recorderRef.current = recorder;
-
-    let blinkInterval = null;
-    const stopBlink = () => { if (blinkInterval) { clearInterval(blinkInterval); blinkInterval = null; } };
-
-    for (let i = 0; i < shots.length; i++) {
-      setShotIdx(i);
-      setExportProgress(Math.round((i / shots.length) * 90));
-      stopBlink();
-      drawShotOnCanvas(canvas, shots[i], style);
-      blinkInterval = setInterval(() => { drawShotOnCanvas(canvas, shots[i], style); }, 300);
-      await new Promise(resolve => {
-        const utt = new SpeechSynthesisUtterance(clean(shots[i].voiceover));
-        utt.rate = 0.88; utt.pitch = 0.92; utt.volume = 1;
-        const voices = window.speechSynthesis.getVoices();
-        const v = voices.find(v => v.name.includes("David") && v.lang.startsWith("en"))
-          || voices.find(v => v.name.includes("James") && v.lang.startsWith("en"))
-          || voices.find(v => v.name.includes("Daniel") && v.lang.startsWith("en"))
-          || voices.find(v => v.name.includes("Male") && v.lang.startsWith("en"))
-          || voices.find(v => v.lang === "en-GB")
-          || voices.find(v => v.lang.startsWith("en"))
-          || voices[0];
-        if (v) utt.voice = v;
-        utt.onend = () => { stopBlink(); setTimeout(resolve, 300); };
-        utt.onerror = () => { stopBlink(); resolve(); };
-        window.speechSynthesis.speak(utt);
-      });
-    }
-
-    stopBlink();
-    setExportProgress(95);
-    await new Promise(r => setTimeout(r, 500));
-    recorder.stop();
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: "video/webm" });
-      setVideoURL(URL.createObjectURL(blob));
-      setExportProgress(100);
-      setPhase("done");
-    };
-  }, [shots, style]);
-
-  const shot = shots[shotIdx] || {};
-  const SS = { fontFamily: "'Space Grotesk','Segoe UI',sans-serif" };
-
-  // ── EDIT SCREEN
-  if (view === "edit") return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...SS }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        <button onClick={() => setView("player")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ fontSize: 12, color: "#d4af37", fontWeight: 700 }}>Edit Shot {shotIdx + 1} / {shots.length}</div>
-        <button onClick={() => setView("player")} style={{ padding: "7px 16px", background: "#d4af37", border: "none", color: "#000", fontSize: 13, fontWeight: 900, cursor: "pointer", borderRadius: 4 }}>Done ✓</button>
-      </div>
-
-      {/* Shot selector tabs */}
-      <div style={{ display: "flex", overflowX: "auto", gap: 6, padding: "10px 16px", borderBottom: "1px solid #111", flexShrink: 0 }}>
-        {shots.map((_, i) => (
-          <button key={i} onClick={() => setShotIdx(i)}
-            style={{ padding: "6px 14px", background: i === shotIdx ? "#d4af37" : "#0a0a0a", border: `1px solid ${i === shotIdx ? "#d4af37" : "#1a1a1a"}`, borderRadius: 4, color: i === shotIdx ? "#000" : "#555", fontSize: 12, fontWeight: 700, cursor: "pointer", flexShrink: 0, fontFamily: "inherit" }}>
-            {i + 1}
-          </button>
-        ))}
-      </div>
-
-      <div style={{ flex: 1, overflowY: "auto", padding: "20px 20px" }}>
-        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Text Overlay (on screen)</div>
-        <textarea value={editShots[shotIdx]?.textOverlay || ""}
-          onChange={e => updateShot(shotIdx, "textOverlay", e.target.value)}
-          placeholder="Bold text shown on screen..."
-          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#d4af37", fontSize: 15, fontWeight: 700, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", marginBottom: 20 }} rows={2} />
-
-        <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Voiceover (spoken aloud)</div>
-        <textarea value={editShots[shotIdx]?.voiceover || ""}
-          onChange={e => updateShot(shotIdx, "voiceover", e.target.value)}
-          placeholder="What the voice says..."
-          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#fff", fontSize: 15, fontWeight: 600, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5, marginBottom: 20 }} rows={4} />
-
-        <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }}>Visual Concept</div>
-        <textarea value={editShots[shotIdx]?.visual || ""}
-          onChange={e => updateShot(shotIdx, "visual", e.target.value)}
-          placeholder="What to show or animate on screen..."
-          style={{ width: "100%", background: "#0a0a0a", border: "1px solid #333", borderRadius: 8, padding: "12px 14px", color: "#888", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.5 }} rows={3} />
-
-        {/* Nav between shots */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 24 }}>
-          <button onClick={() => setShotIdx(i => Math.max(0, i - 1))} disabled={shotIdx === 0}
-            style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: shotIdx === 0 ? "#222" : "#888", fontSize: 13, fontWeight: 700, cursor: shotIdx === 0 ? "not-allowed" : "pointer", borderRadius: 4 }}>← Prev Shot</button>
-          <button onClick={() => setShotIdx(i => Math.min(shots.length - 1, i + 1))} disabled={shotIdx === shots.length - 1}
-            style={{ padding: "13px", background: shotIdx === shots.length - 1 ? "transparent" : "#d4af37", border: `1px solid ${shotIdx === shots.length - 1 ? "#1a1a1a" : "#d4af37"}`, color: shotIdx === shots.length - 1 ? "#222" : "#000", fontSize: 13, fontWeight: 700, cursor: shotIdx === shots.length - 1 ? "not-allowed" : "pointer", borderRadius: 4 }}>Next Shot →</button>
-        </div>
+// LOADING
+function LoadingScreen({ topic }) {
+  const steps = ["Crafting your hook...", "Writing carousel slides...", "Building your thread...", "Scripting TikTok...", "Packaging everything..."];
+  const [step, setStep] = useState(0);
+  useState(() => {
+    const t = setInterval(() => setStep(s => Math.min(s + 1, steps.length - 1)), 900);
+    return () => clearInterval(t);
+  });
+  return (
+    <div style={{ minHeight: "100dvh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 28px", gap: 24 }}>
+      <div style={{ width: 44, height: 44, border: "3px solid #1a1400", borderTop: "3px solid #d4af37", borderRadius: "50%", animation: "spin 0.9s linear infinite" }} />
+      <div style={{ textAlign: "center" }}>
+        <div style={{ fontSize: 14, color: "#d4af37", fontWeight: 700, marginBottom: 6, animation: "pulse 1.5s ease infinite" }}>{steps[step]}</div>
+        <div style={{ fontSize: 12, color: "#222" }}>{topic}</div>
       </div>
     </div>
   );
+}
+
+// RESULT — the full content pack
+function ResultScreen({ pack, onBack, onRegenerate }) {
+  const { topic, cat, platforms, data } = pack;
+  const hasPlatform = (id) => platforms.includes(id);
+  const catObj = CATEGORIES.find(c => c.id === cat);
+
+  const allHashtags = data.hashtags?.join(" ") || "";
+  const fullCaption = `${data.caption}\n\n${allHashtags}`;
+  const fullCarousel = data.carousel?.map(s => `Slide ${s.slide}: ${s.headline}\n${s.body}`).join("\n\n") || "";
+  const fullThread = data.thread?.join("\n\n") || "";
+  const fullTikTok = data.tiktok_script
+    ? `Hook: ${data.tiktok_script.hook_line}\n\n${data.tiktok_script.body}\n\n${data.tiktok_script.outro}`
+    : "";
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 1000, display: "flex", flexDirection: "column", ...S }}>
-      <canvas ref={canvasRef} style={{ display: "none" }} />
-
+    <div style={{ minHeight: "100dvh", paddingBottom: 40 }}>
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 20px", borderBottom: "1px solid #111" }}>
-        <button onClick={() => {
-          isPlayingRef.current = false;
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.cancel();
-          setPhase("ready"); setShotIdx(0); setWordIdx(-1);
-          onClose();
-        }} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer" }}>←</button>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{clean(data.title)}</div>
-          <div style={{ fontSize: 10, color: "#333" }}>Style {style} · Shot {shotIdx + 1}/{shots.length}</div>
+      <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#050505", borderBottom: "1px solid #0d0d0d", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#aaa", fontSize: 20, cursor: "pointer", flexShrink: 0 }}>←</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#fff", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{topic}</div>
+          <div style={{ fontSize: 11, color: "#333" }}>{catObj?.icon} {catObj?.label} · {platforms.length} platform{platforms.length > 1 ? "s" : ""}</div>
         </div>
-        <button onClick={() => { window.speechSynthesis.cancel(); isPlayingRef.current = false; setPhase("ready"); setView("edit"); }}
-          style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>✏ Edit</button>
+        <button onClick={onRegenerate} style={{ padding: "8px 14px", background: "transparent", border: "1px solid #1a1a1a", color: "#444", fontSize: 12, fontWeight: 600, borderRadius: 8, cursor: "pointer", flexShrink: 0 }}>↻ Redo</button>
       </div>
 
-      {/* Video stage */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px", userSelect: "none" }}
-        onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <div style={{ width: "100%", maxWidth: 320, aspectRatio: "9/16", background: "#000", borderRadius: 14, border: "1px solid #1a1a1a", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "24px 20px", boxSizing: "border-box", position: "relative", overflow: "hidden", transition: "opacity 0.15s ease", opacity: visible ? 1 : 0 }}>
-          <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 0%,#d4af3710 0%,transparent 60%)", pointerEvents: "none" }} />
+      <div style={{ padding: "20px 20px 0" }}>
 
-          {/* Top */}
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 9, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase" }}>ReelLoader</span>
-            <span style={{ fontSize: 9, fontFamily: "monospace", color: "#2a2a2a" }}>{shot.timestamp}</span>
+        {/* HOOK */}
+        <Section label="Hook" color="#d4af37" copyText={data.hook}>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>{data.hook}</div>
+        </Section>
+
+        {/* CAROUSEL */}
+        <Section label="Carousel Slides" color="#60a5fa" copyText={fullCarousel}>
+          {/* Hook card */}
+          <div style={{ background: "#060606", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px", marginBottom: 8 }}>
+            <div style={{ fontSize: 9, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>HOOK CARD</div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>{data.hook_card}</div>
           </div>
+          {/* Content slides */}
+          {data.carousel?.map((s, i) => (
+            <div key={i} style={{ background: "#060606", border: "1px solid #111", borderRadius: 8, padding: "12px 14px", marginBottom: 8, display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: "#1a1a1a", fontFamily: "monospace", paddingTop: 2, flexShrink: 0 }}>0{s.slide}</div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: "#60a5fa", fontWeight: 700, marginBottom: 4 }}>{s.headline}</div>
+                <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.5 }}>{s.body}</div>
+              </div>
+              <CopyBtn text={`${s.headline}\n${s.body}`} />
+            </div>
+          ))}
+          {/* CTA card */}
+          <div style={{ background: "#060606", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px 14px" }}>
+            <div style={{ fontSize: 9, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>CTA CARD</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>{data.cta_card}</div>
+          </div>
+        </Section>
 
-          {/* Content */}
-          {style === "A" ? (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 0 }}>
-              <div style={{ fontSize: 11, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", marginBottom: 16, opacity: 0.7 }}>{clean(shot.textOverlay)}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 8px", alignContent: "flex-start", marginBottom: 14 }}>
-                {clean(shot.voiceover).split(" ").map((word, wi) => {
-                  const show = wordIdx === -1 || wi <= wordIdx;
-                  return (
-                    <span key={wi} style={{
-                      fontSize: 26, fontWeight: 800,
-                      color: "#ffffff",
-                      lineHeight: 1.35,
-                      opacity: show ? 1 : 0.15,
-                      transition: "opacity 0.25s ease",
-                      fontFamily: "'Space Grotesk', sans-serif",
-                    }}>{word}</span>
-                  );
-                })}
-              </div>
-              {/* Visual concept — style A */}
-              <div style={{ padding: "8px 10px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 6 }}>
-                <div style={{ fontSize: 8, color: "#333", letterSpacing: 1.5, marginBottom: 2 }}>VISUAL</div>
-                <div style={{ fontSize: 10, color: "#444" }}>{clean(shot.visual)}</div>
-              </div>
-            </div>
-          ) : (
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "12px 0", gap: 10 }}>
-              <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 3, textTransform: "uppercase", opacity: 0.8 }}>{clean(shot.textOverlay)}</div>
-              <div style={{ width: 28, height: 2, background: "#d4af37", borderRadius: 1, opacity: 0.4 }} />
-              <div style={{ fontSize: 20, fontWeight: 800, color: "#ffffff", lineHeight: 1.55 }}>{clean(shot.voiceover)}</div>
-              {/* Visual concept — style B */}
-              <div style={{ marginTop: 4, padding: "8px 10px", background: "#0d0d0d", border: "1px solid #1a1a1a", borderRadius: 6 }}>
-                <div style={{ fontSize: 9, color: "#333", letterSpacing: 1.5, marginBottom: 3 }}>VISUAL</div>
-                <div style={{ fontSize: 10, color: "#444" }}>{clean(shot.visual)}</div>
-              </div>
-            </div>
-          )}
+        {/* CAPTION + HASHTAGS */}
+        <Section label="Caption + Hashtags" color="#a78bfa" copyText={fullCaption}>
+          <div style={{ fontSize: 14, color: "#ccc", marginBottom: 12, lineHeight: 1.6 }}>{data.caption}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {data.hashtags?.map((h, i) => (
+              <span key={i} style={{ background: "#0d0d0d", border: "1px solid #1a1a1a", color: "#a78bfa", fontSize: 11, padding: "4px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>
+            ))}
+          </div>
+        </Section>
 
-          {/* Progress */}
-          <div>
-            <div style={{ height: 2, background: "#111", borderRadius: 1, overflow: "hidden", marginBottom: 8 }}>
-              <div style={{ height: "100%", width: `${((shotIdx + 1) / shots.length) * 100}%`, background: "#d4af37", transition: "width 0.3s" }} />
+        {/* X THREAD */}
+        {hasPlatform("twitter") && data.thread?.length > 0 && (
+          <Section label="𝕏 Thread" color="#e2e8f0" copyText={fullThread}>
+            {data.thread.map((tweet, i) => (
+              <div key={i} style={{ display: "flex", gap: 12, marginBottom: i < data.thread.length - 1 ? 14 : 0, paddingBottom: i < data.thread.length - 1 ? 14 : 0, borderBottom: i < data.thread.length - 1 ? "1px solid #0d0d0d" : "none" }}>
+                <div style={{ fontSize: 10, color: "#1a1a1a", fontFamily: "monospace", paddingTop: 3, flexShrink: 0 }}>{i + 1}/</div>
+                <div style={{ flex: 1, fontSize: 14, color: "#ccc", lineHeight: 1.6 }}>{tweet}</div>
+                <CopyBtn text={tweet} />
+              </div>
+            ))}
+          </Section>
+        )}
+
+        {/* TIKTOK SCRIPT */}
+        {hasPlatform("tiktok") && data.tiktok_script && (
+          <Section label="🎵 TikTok Script" color="#f472b6" copyText={fullTikTok}>
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: "#f472b6", letterSpacing: 2, marginBottom: 6 }}>HOOK (0–3s)</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", lineHeight: 1.4 }}>{data.tiktok_script.hook_line}</div>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 8, color: "#1a1a1a" }}>rollyadamstechworld.com.ng</span>
-              <span style={{ fontSize: 8, color: "#1a1a1a" }}>@rollyadamstechworld</span>
+            <div style={{ marginBottom: 14, paddingTop: 14, borderTop: "1px solid #0d0d0d" }}>
+              <div style={{ fontSize: 9, color: "#888", letterSpacing: 2, marginBottom: 6 }}>BODY (3–30s)</div>
+              <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.7 }}>{data.tiktok_script.body}</div>
             </div>
+            <div style={{ paddingTop: 14, borderTop: "1px solid #0d0d0d" }}>
+              <div style={{ fontSize: 9, color: "#888", letterSpacing: 2, marginBottom: 6 }}>OUTRO + CTA</div>
+              <div style={{ fontSize: 14, color: "#ccc" }}>{data.tiktok_script.outro}</div>
+            </div>
+          </Section>
+        )}
+
+        {/* LINKEDIN */}
+        {hasPlatform("linkedin") && data.linkedin_post && (
+          <Section label="💼 LinkedIn Post" color="#38bdf8" copyText={data.linkedin_post}>
+            <div style={{ fontSize: 14, color: "#ccc", lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{data.linkedin_post}</div>
+          </Section>
+        )}
+
+        {/* CANVA TIP */}
+        <div style={{ background: "#060606", border: "1px solid #0d0d0d", borderRadius: 12, padding: "14px 16px", marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: "#2a2a2a", letterSpacing: 2, marginBottom: 8 }}>NEXT STEP</div>
+          <div style={{ fontSize: 13, color: "#333", lineHeight: 1.7 }}>
+            1. Copy carousel slides → paste into your Canva template<br />
+            2. Export → schedule in Buffer<br />
+            3. Use TikTok/X content directly from above
           </div>
         </div>
+
+        <button onClick={onRegenerate}
+          style={{ width: "100%", padding: "14px", background: "transparent", border: "1px solid #d4af3730", color: "#d4af37", fontSize: 14, fontWeight: 700, borderRadius: 10, cursor: "pointer" }}>
+          ↻ Regenerate This Topic
+        </button>
       </div>
-
-      {/* Controls */}
-      {phase === "ready" && (
-        <div style={{ padding: "10px 20px 32px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <button onClick={playPreview} style={{ padding: "14px", background: "#0a0a0a", border: "1px solid #2a2a2a", color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>▶ Preview</button>
-          <button onClick={exportVideo} style={{ padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⬇ Export MP4</button>
-          <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "center", gap: 8 }}>
-            {shots.map((_, i) => <div key={i} onClick={() => setShotIdx(i)} style={{ width: i === shotIdx ? 20 : 6, height: 6, borderRadius: 3, background: i === shotIdx ? "#d4af37" : "#1a1a1a", transition: "all 0.3s", cursor: "pointer" }} />)}
-          </div>
-          <div style={{ gridColumn: "1/-1", fontSize: 11, color: "#2a2a2a", textAlign: "center" }}>Swipe to browse shots · ✏ Edit to change any shot</div>
-        </div>
-      )}
-
-      {phase === "playing" && (
-        <div style={{ padding: "10px 20px 32px" }}>
-          <button onClick={() => {
-          isPlayingRef.current = false;
-          window.speechSynthesis.cancel();
-          window.speechSynthesis.cancel();
-          setPhase("ready"); setShotIdx(0); setWordIdx(-1);
-        }} style={{ width: "100%", padding: "14px", background: "#1a1a1a", border: "none", color: "#888", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>⏹ Stop</button>
-        </div>
-      )}
-
-      {phase === "recording" && (
-        <div style={{ padding: "20px 20px 32px" }}>
-          <div style={{ height: 6, background: "#111", borderRadius: 3, overflow: "hidden", marginBottom: 12 }}>
-            <div style={{ height: "100%", width: `${exportProgress}%`, background: "#d4af37", transition: "width 0.4s" }} />
-          </div>
-          <div style={{ color: "#d4af37", fontSize: 13, fontWeight: 700, textAlign: "center", marginBottom: 6 }}>Rendering... {exportProgress}%</div>
-          <div style={{ color: "#2a2a2a", fontSize: 11, textAlign: "center" }}>Keep screen on · Unmute your phone</div>
-        </div>
-      )}
-
-      {phase === "done" && (
-        <div style={{ padding: "10px 20px 32px", display: "grid", gap: 10 }}>
-          <a href={videoURL} download="reelloader-video.webm" style={{ display: "block", padding: "15px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 6, textAlign: "center", textDecoration: "none" }}>⬇ Download Video</a>
-          <button onClick={() => { setPhase("ready"); setExportProgress(0); setVideoURL(""); setShotIdx(0); }} style={{ padding: "13px", background: "transparent", border: "1px solid #1a1a1a", color: "#555", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 6 }}>🔄 Export Again</button>
-        </div>
-      )}
     </div>
   );
 }
 
+// HISTORY
+function HistoryScreen({ onBack, onLoad }) {
+  const history = loadHistory();
+  return (
+    <div style={{ minHeight: "100dvh", paddingBottom: 40 }}>
+      <div style={{ padding: "52px 24px 20px", display: "flex", alignItems: "center", gap: 14, borderBottom: "1px solid #0d0d0d" }}>
+        <button onClick={onBack} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
+        <div style={{ fontSize: 20, fontWeight: 800 }}>History</div>
+      </div>
+      <div style={{ padding: "20px 20px 0" }}>
+        {history.length === 0 ? (
+          <div style={{ textAlign: "center", paddingTop: 80, color: "#1a1a1a", fontSize: 14 }}>No content generated yet</div>
+        ) : history.map((pack, i) => {
+          const catObj = CATEGORIES.find(c => c.id === pack.cat);
+          return (
+            <button key={i} onClick={() => onLoad(pack)}
+              style={{ width: "100%", padding: "14px 16px", background: "#080808", border: "1px solid #111", borderRadius: 10, cursor: "pointer", textAlign: "left", marginBottom: 10, display: "block" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{catObj?.icon} {catObj?.label}</span>
+                <span style={{ fontSize: 10, color: "#1a1a1a" }}>{pack.at}</span>
+              </div>
+              <div style={{ fontSize: 14, color: "#666", fontWeight: 600, marginBottom: 4 }}>{pack.topic}</div>
+              <div style={{ fontSize: 12, color: "#1a1a1a" }}>{pack.platforms?.map(p => PLATFORMS.find(pl => pl.id === p)?.icon).join(" ")}</div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────────────
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [screen, setScreen] = useState("splash");
-  const [key, setKey] = useState(() => localStorage.getItem(KEY_STORAGE) || "");
-  const [keyInput, setKeyInput] = useState("");
-  const [selCat, setSelCat] = useState(null);
-  const [selOutput, setSelOutput] = useState(null); // "cards" | "video"
-  const [selVideoStyle, setSelVideoStyle] = useState(null); // "A" | "B"
-  const [customTopic, setCustomTopic] = useState("");
-  const [selTopic, setSelTopic] = useState(null);
-  const [cardsData, setCardsData] = useState(null);
-  const [videoData, setVideoData] = useState(null);
+  const [key, setKey] = useState(() => localStorage.getItem(STORAGE_KEY) || "");
   const [loading, setLoading] = useState(false);
-  const [loadMsg, setLoadMsg] = useState("");
+  const [loadingTopic, setLoadingTopic] = useState("");
+  const [currentPack, setCurrentPack] = useState(null);
   const [error, setError] = useState("");
-  const [history, setHistory] = useState(() => { try { return JSON.parse(localStorage.getItem(HISTORY_STORAGE) || "[]"); } catch { return []; } });
-  const [showCardsViewer, setShowCardsViewer] = useState(false);
-  const [showVideoAnimator, setShowVideoAnimator] = useState(false);
-  const [cardsViewerIdx, setCardsViewerIdx] = useState(0);
-  const [videoAnimatorIdx, setVideoAnimatorIdx] = useState(0);
-  const [ownContent, setOwnContent] = useState("");
+  const [pendingParams, setPendingParams] = useState(null);
 
-  const cat = CATEGORIES.find(c => c.id === selCat);
-
-  const saveKey = () => {
-    if (!keyInput.trim()) return;
-    localStorage.setItem(KEY_STORAGE, keyInput.trim());
-    setKey(keyInput.trim()); setError(""); setScreen("home");
+  const saveKey = (k) => {
+    localStorage.setItem(STORAGE_KEY, k);
+    setKey(k);
+    setScreen("home");
   };
 
-  const generate = useCallback(async (topic) => {
-    setSelTopic(topic); setLoading(true); setError("");
-    setCardsData(null); setVideoData(null);
+  const generate = useCallback(async (params) => {
+    if (!key) { setPendingParams(params); setScreen("key"); return; }
+    setError("");
+    setLoadingTopic(params.topic);
+    setLoading(true);
+    const catObj = CATEGORIES.find(c => c.id === params.cat);
     try {
-      if (selOutput === "cards") {
-        setLoadMsg("🃏 Building your cards...");
-        const d = await groq(cardsPrompt(topic, cat?.label, ownContent));
-        setCardsData(d);
-        const entry = { id: Date.now(), cat: selCat, output: "cards", style: null, topic, data: d, at: new Date().toLocaleString("en-GB") };
-        const updated = [entry, ...history].slice(0, 30);
-        setHistory(updated); localStorage.setItem(HISTORY_STORAGE, JSON.stringify(updated));
-        setScreen("result");
-      } else {
-        setLoadMsg("🎬 Writing video script...");
-        const d = await groq(videoPrompt(topic, cat?.label, selVideoStyle, ownContent));
-        setVideoData(d);
-        const entry = { id: Date.now(), cat: selCat, output: "video", style: selVideoStyle, topic, data: d, at: new Date().toLocaleString("en-GB") };
-        const updated = [entry, ...history].slice(0, 30);
-        setHistory(updated); localStorage.setItem(HISTORY_STORAGE, JSON.stringify(updated));
-        setScreen("result");
-      }
-    } catch (e) { setError("❌ " + e.message); }
-    finally { setLoading(false); }
-  }, [selCat, selOutput, selVideoStyle, cat, history]);
+      const data = await callGroq(key, buildPrompt(params.topic, catObj?.label, params.platforms, params.cta, params.ownContent));
+      const pack = {
+        ...params,
+        data,
+        at: new Date().toLocaleDateString("en-NG", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+      };
+      saveHistory(pack);
+      setCurrentPack(pack);
+      setScreen("result");
+    } catch (e) {
+      setError(e.message || "Something went wrong. Try again.");
+      setScreen("home");
+    } finally { setLoading(false); }
+  }, [key]);
 
-  if (showCardsViewer && cardsData) return <CardsViewer data={cardsData} topic={selTopic} initialIdx={cardsViewerIdx} onClose={() => setShowCardsViewer(false)} />;
-  if (showVideoAnimator && videoData) return <VideoAnimator data={videoData} style={selVideoStyle} initialShotIdx={videoAnimatorIdx} onClose={() => setShowVideoAnimator(false)} />;
+  // After key saved, resume pending generation
+  const handleKeySave = (k) => {
+    saveKey(k);
+    if (pendingParams) {
+      const p = pendingParams; setPendingParams(null);
+      setTimeout(() => generate({ ...p }), 100);
+    }
+  };
 
-  // ── SPLASH
-  if (screen === "splash") return (
-    <div style={{ minHeight: "100dvh", background: "#000", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 28px", ...S }}>
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at 50% 20%,#140f00 0%,#000 60%)", pointerEvents: "none" }} />
-      <div style={{ position: "relative", textAlign: "center", width: "100%" }}>
-        <div style={{ fontSize: 11, color: "#d4af37", letterSpacing: 5, fontWeight: 700, marginBottom: 14, textTransform: "uppercase" }}>Rollyadams Techworld</div>
-        <h1 style={{ fontSize: 52, fontWeight: 900, color: "#fff", lineHeight: 1, margin: "0 0 6px", letterSpacing: -2 }}>Reel<span style={{ color: "#d4af37" }}>Loader</span></h1>
-        <div style={{ fontSize: 11, color: "#2a2a2a", letterSpacing: 3, marginBottom: 12, textTransform: "uppercase" }}>Educator Edition v{APP_VERSION}</div>
-        <p style={{ color: "#444", fontSize: 14, margin: "0 0 48px", lineHeight: 1.7 }}>Pick a topic. Get cards or an animated video.<br />Screenshot or download. Post.</p>
-        <button onClick={() => setScreen(key ? "home" : "setup")} style={{ width: "100%", background: "#d4af37", border: "none", color: "#000", padding: "15px", borderRadius: 4, fontSize: 15, fontWeight: 900, cursor: "pointer", letterSpacing: 1, textTransform: "uppercase" }}>Enter Studio</button>
-        {history.length > 0 && <button onClick={() => setScreen("history")} style={{ marginTop: 14, background: "none", border: "none", color: "#2a2a2a", fontSize: 13, cursor: "pointer", width: "100%" }}>📁 History ({history.length})</button>}
-      </div>
-      <div style={{ position: "absolute", bottom: 20, color: "#111", fontSize: 11 }}>v{APP_VERSION}</div>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700;800;900&display=swap');`}</style>
-    </div>
+  if (loading) return <LoadingScreen topic={loadingTopic} />;
+
+  if (screen === "splash") return <SplashScreen onNext={() => key ? setScreen("home") : setScreen("key")} />;
+  if (screen === "key") return <KeyScreen onSave={handleKeySave} />;
+  if (screen === "result" && currentPack) return (
+    <ResultScreen
+      pack={currentPack}
+      onBack={() => setScreen("home")}
+      onRegenerate={() => generate(currentPack)}
+    />
   );
-
-  // ── SETUP
-  if (screen === "setup") return (
-    <div style={{ minHeight: "100dvh", background: "#000", padding: "60px 24px 40px", ...S }}>
-      <button onClick={() => setScreen("splash")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-      <div style={{ marginTop: 24 }}>
-        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 10, textTransform: "uppercase" }}>One-time setup</div>
-        <h2 style={{ color: "#fff", fontSize: 26, fontWeight: 900, marginBottom: 24 }}>Connect Groq</h2>
-        <p style={{ color: "#444", fontSize: 14, lineHeight: 1.7, marginBottom: 24 }}>Free at <strong style={{ color: "#d4af37" }}>console.groq.com</strong><br />Sign up → API Keys → Create key → Paste below</p>
-        <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === "Enter" && saveKey()} placeholder="gsk_..." style={{ width: "100%", padding: "14px 16px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 4, fontSize: 15, fontFamily: "monospace", color: "#fff", outline: "none", boxSizing: "border-box" }} />
-        {error && <div style={{ color: "#ff5555", fontSize: 13, marginTop: 8, padding: "10px 12px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
-        <button onClick={saveKey} disabled={!keyInput.trim()} style={{ width: "100%", marginTop: 12, padding: "14px", background: keyInput.trim() ? "#d4af37" : "#111", border: "none", color: keyInput.trim() ? "#000" : "#333", fontSize: 15, fontWeight: 900, cursor: keyInput.trim() ? "pointer" : "not-allowed", borderRadius: 4 }}>Save & Enter →</button>
-      </div>
-    </div>
-  );
-
-  // ── HOME — pick category
-  if (screen === "home") return (
-    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
-      {loading && <Spinner msg={loadMsg} />}
-      <div style={{ padding: "48px 20px 40px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 28 }}>
-          <div>
-            <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>ReelLoader</div>
-            <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900 }}>Pick a Category</h2>
-          </div>
-          <button onClick={() => { setError(""); setScreen("setup"); }} style={{ background: "none", border: "1px solid #1a1a1a", color: "#444", padding: "6px 12px", borderRadius: 4, fontSize: 11, cursor: "pointer" }}>⚙ Key</button>
-        </div>
-        {error && <div style={{ background: "#1a0000", border: "1px solid #3a0000", borderRadius: 8, padding: "12px 14px", marginBottom: 16 }}><div style={{ color: "#ff5555", fontSize: 13, marginBottom: 8 }}>{error}</div><button onClick={() => { setError(""); setScreen("setup"); }} style={{ padding: "6px 12px", background: "#ff5555", border: "none", color: "#fff", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>Fix Key</button></div>}
-        <div style={{ display: "grid", gap: 10 }}>
-          {CATEGORIES.map(c => (
-            <button key={c.id} onClick={() => { setSelCat(c.id); setScreen("outputType"); }} style={{ padding: "16px 18px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", gap: 14 }}>
-              <div style={{ width: 46, height: 46, borderRadius: 8, background: `${c.color}18`, border: `1px solid ${c.color}30`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, flexShrink: 0 }}>{c.icon}</div>
-              <div style={{ flex: 1 }}><div style={{ fontSize: 15, fontWeight: 700, color: "#fff", marginBottom: 2 }}>{c.label}</div><div style={{ fontSize: 12, color: "#444" }}>{c.topics.slice(0, 2).join(", ")}...</div></div>
-              <div style={{ color: "#2a2a2a", fontSize: 18 }}>›</div>
-            </button>
-          ))}
-        </div>
-        {history.length > 0 && <button onClick={() => setScreen("history")} style={{ width: "100%", marginTop: 16, padding: "11px", background: "transparent", border: "1px solid #1a1a1a", color: "#444", fontSize: 12, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>📁 History ({history.length})</button>}
-      </div>
-    </div>
-  );
-
-  // ── OUTPUT TYPE
-  if (screen === "outputType") return (
-    <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-      <div style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{cat?.icon} {cat?.label}</div>
-        <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>What to create?</h2>
-        <p style={{ color: "#444", fontSize: 13, marginBottom: 28 }}>Pick your output format</p>
-        <div style={{ display: "grid", gap: 12 }}>
-          <button onClick={() => { setSelOutput("cards"); setScreen("topic"); }} style={{ padding: "22px 20px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, cursor: "pointer", textAlign: "left", display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ fontSize: 32 }}>🃏</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Carousel Cards</div>
-              <div style={{ fontSize: 12, color: "#555" }}>7 designed cards · Screenshot each · Post as carousel</div>
-            </div>
-          </button>
-          <button onClick={() => { setSelOutput("video"); setScreen("videoStyle"); }} style={{ padding: "22px 20px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, cursor: "pointer", textAlign: "left", display: "flex", gap: 16, alignItems: "center" }}>
-            <div style={{ fontSize: 32 }}>🎬</div>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 4 }}>Animated Video</div>
-              <div style={{ fontSize: 12, color: "#555" }}>60-sec reel · AI voice · Download MP4</div>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── VIDEO STYLE
-  if (screen === "videoStyle") return (
-    <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      <button onClick={() => setScreen("outputType")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-      <div style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>Video Style</div>
-        <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>Choose a style</h2>
-        <p style={{ color: "#444", fontSize: 13, marginBottom: 28 }}>Both work well for educational content</p>
-        <div style={{ display: "grid", gap: 12 }}>
-          <button onClick={() => { setSelVideoStyle("A"); setScreen("topic"); }} style={{ padding: "22px 20px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, cursor: "pointer", textAlign: "left" }}>
-            <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>STYLE A</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Bold Text Animation</div>
-            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>Powerful words appear on black background. Like motivational reels. High impact, minimal design.</div>
-            <div style={{ marginTop: 12, background: "#000", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: "#fff" }}>WHAT IS AN API?</div>
-            </div>
-          </button>
-          <button onClick={() => { setSelVideoStyle("B"); setScreen("topic"); }} style={{ padding: "22px 20px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, cursor: "pointer", textAlign: "left" }}>
-            <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, marginBottom: 8, letterSpacing: 1 }}>STYLE B</div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: "#fff", marginBottom: 6 }}>Educational Slides</div>
-            <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>Headline + explanation + visual direction. Like a proper explainer video. Builds understanding.</div>
-            <div style={{ marginTop: 12, background: "#000", border: "1px solid #1a1a1a", borderRadius: 8, padding: "12px" }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: "#d4af37", marginBottom: 6 }}>WHAT IS AN API?</div>
-              <div style={{ fontSize: 11, color: "#555" }}>The waiter between your app and the kitchen...</div>
-            </div>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── TOPIC
-  if (screen === "topic") return (
-    <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      {loading && <Spinner msg={loadMsg} />}
-      <button onClick={() => setScreen(selOutput === "video" ? "videoStyle" : "outputType")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-      <div style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 3, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" }}>{cat?.icon} {cat?.label} · {selOutput === "cards" ? "🃏 Cards" : `🎬 Style ${selVideoStyle}`}</div>
-        <h2 style={{ color: "#fff", fontSize: 24, fontWeight: 900, marginBottom: 6 }}>Pick a Topic</h2>
-        <p style={{ color: "#444", fontSize: 13, marginBottom: 20 }}>Or type your own</p>
-        {error && <div style={{ color: "#ff5555", fontSize: 13, marginBottom: 14, padding: "10px 12px", background: "#1a0000", borderRadius: 4 }}>⚠️ {error}</div>}
-        <div style={{ display: "flex", gap: 8, marginBottom: selOutput === "cards" ? 12 : 20 }}>
-          <input value={customTopic} onChange={e => setCustomTopic(e.target.value)} onKeyDown={e => e.key === "Enter" && customTopic.trim() && generate(customTopic.trim())} placeholder="Type any topic..." style={{ flex: 1, padding: "12px 14px", background: "#0a0a0a", border: "1px solid #222", borderRadius: 4, fontSize: 14, color: "#fff", outline: "none", fontFamily: "inherit" }} />
-          <button onClick={() => customTopic.trim() && generate(customTopic.trim())} disabled={!customTopic.trim()} style={{ padding: "12px 18px", background: customTopic.trim() ? "#d4af37" : "#111", border: "none", color: customTopic.trim() ? "#000" : "#333", fontSize: 14, fontWeight: 700, cursor: customTopic.trim() ? "pointer" : "not-allowed", borderRadius: 4 }}>Go →</button>
-        </div>
-        {(selOutput === "cards" || selOutput === "video") && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 8, textTransform: "uppercase" }}>Or paste your own content (optional)</div>
-            <textarea value={ownContent} onChange={e => setOwnContent(e.target.value)}
-              placeholder={selOutput === "cards" ? "Paste your content — AI will spread it across all 5 cards..." : "Paste your content — AI will spread it across all 6 video shots..."}
-              style={{ width: "100%", background: "#0a0a0a", border: `1px solid ${ownContent.trim() ? "#d4af37" : "#222"}`, borderRadius: 6, padding: "12px 14px", color: "#ccc", fontSize: 13, fontFamily: "inherit", resize: "none", outline: "none", boxSizing: "border-box", lineHeight: 1.6 }} rows={4} />
-            {ownContent.trim() && <div style={{ fontSize: 11, color: "#d4af37", marginTop: 6 }}>✓ Your content will be reformatted and distributed. Still pick a topic above.</div>}
-          </div>
-        )}
-        <div style={{ fontSize: 10, color: "#2a2a2a", letterSpacing: 2, marginBottom: 12, textTransform: "uppercase" }}>Suggested</div>
-        <div style={{ display: "grid", gap: 8 }}>
-          {cat?.topics.map((t, i) => (
-            <button key={i} onClick={() => generate(t)} style={{ padding: "13px 16px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 6, cursor: "pointer", textAlign: "left", fontSize: 14, color: "#ccc", fontFamily: "inherit", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              {t}<span style={{ color: "#2a2a2a" }}>›</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // ── RESULT
-  if (screen === "result") return (
-    <div style={{ minHeight: "100dvh", background: "#000", ...S }}>
-      <div style={{ padding: "48px 20px 60px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-          <button onClick={() => setScreen("topic")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-          <div style={{ fontSize: 10, color: "#d4af37", fontWeight: 700, letterSpacing: 2, textTransform: "uppercase" }}>{selOutput === "cards" ? "🃏 Cards" : `🎬 Style ${selVideoStyle}`}</div>
-          <button onClick={() => { setScreen("home"); setCardsData(null); setVideoData(null); }} style={{ background: "none", border: "1px solid #1a1a1a", color: "#444", padding: "5px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer" }}>+ New</button>
-        </div>
-
-        <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 6, padding: "10px 14px", marginBottom: 20 }}>
-          <div style={{ fontSize: 10, color: "#333", marginBottom: 3 }}>TOPIC</div>
-          <div style={{ fontSize: 14, color: "#888", fontWeight: 600 }}>{selTopic}</div>
-        </div>
-
-        {/* CARDS RESULT */}
-        {selOutput === "cards" && cardsData && (
-          <div>
-            <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
-              📱 View & Edit Cards
-            </button>
-            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3730", borderRadius: 10, padding: "14px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 8 }}>HOOK CARD</div>
-                <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>{clean(cardsData.hookCard)}</div>
-              </div>
-              <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
-            </div>
-            {cardsData.cards?.map((c, i) => (
-              <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 6 }}>CARD {i + 1}</div>
-                  <div style={{ fontSize: 13, color: "#d4af37", fontWeight: 700, marginBottom: 4 }}>{clean(c.headline)}</div>
-                  <div style={{ fontSize: 14, color: "#ccc" }}>{clean(c.body)}</div>
-                </div>
-                <button onClick={() => { setCardsViewerIdx(i + 1); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#0a0a0a", border: "1px solid #2a2a2a", color: "#555", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
-              </div>
-            ))}
-            <div style={{ background: "#0a0a0a", border: "1px solid #d4af3330", borderRadius: 10, padding: "12px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>CTA CARD</div>
-                <div style={{ fontSize: 14, color: "#fff", fontWeight: 700 }}>{clean(cardsData.ctaCard)}</div>
-              </div>
-              <button onClick={() => { setCardsViewerIdx((cardsData.cards?.length || 0) + 1); setShowCardsViewer(true); }} style={{ padding: "6px 14px", background: "#1a1400", border: "1px solid #d4af37", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 4, marginLeft: 12, flexShrink: 0 }}>✏ Edit</button>
-            </div>
-            <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>CAPTION + HASHTAGS</div>
-                <CopyBtn text={`${cardsData.caption}\n\n${cardsData.hashtags?.join(" ")}`} />
-              </div>
-              <div style={{ fontSize: 13, color: "#888", marginBottom: 10 }}>{cardsData.caption}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {cardsData.hashtags?.map((h, i) => <span key={i} style={{ background: "#111", border: "1px solid #1e1e1e", color: "#d4af37", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>)}
-              </div>
-            </div>
-            <button onClick={() => { setCardsViewerIdx(0); setShowCardsViewer(true); }} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>📱 View Cards</button>
-          </div>
-        )}
-
-        {/* VIDEO RESULT */}
-        {selOutput === "video" && videoData && (
-          <div>
-            <button onClick={() => { setVideoAnimatorIdx(0); setShowVideoAnimator(true); }} style={{ width: "100%", padding: "16px", background: "#d4af37", border: "none", color: "#000", fontSize: 15, fontWeight: 900, cursor: "pointer", borderRadius: 8, marginBottom: 16 }}>
-              🎬 Animate & Edit Video
-            </button>
-            <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: "#d4af37", letterSpacing: 2, marginBottom: 6 }}>TITLE</div>
-              <div style={{ fontSize: 15, fontWeight: 800, color: "#fff" }}>{clean(videoData.title)}</div>
-            </div>
-            <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-              <div style={{ fontSize: 10, color: "#555", letterSpacing: 2, marginBottom: 6 }}>KEY TAKEAWAY</div>
-              <div style={{ fontSize: 13, color: "#ccc" }}>{clean(videoData.keyTakeaway)}</div>
-            </div>
-            {videoData.shots?.map((shot, i) => (
-              <div key={i} style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, overflow: "hidden", marginBottom: 10 }}>
-                <div style={{ background: "#1a1400", padding: "7px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, color: "#d4af37", fontWeight: 800, fontFamily: "monospace" }}>{shot.timestamp}</span>
-                  <button onClick={() => { setVideoAnimatorIdx(i); setShowVideoAnimator(true); }}
-                    style={{ padding: "4px 12px", background: "transparent", border: "1px solid #d4af3760", color: "#d4af37", fontSize: 11, fontWeight: 700, cursor: "pointer", borderRadius: 3, fontFamily: "inherit" }}>✏ Edit</button>
-                </div>
-                <div style={{ padding: "12px 14px" }}>
-                  <div style={{ fontSize: 14, fontWeight: 800, color: "#fff", marginBottom: 6 }}>{clean(shot.textOverlay)}</div>
-                  <div style={{ fontSize: 12, color: "#888", marginBottom: 6, fontStyle: "italic" }}>{clean(shot.voiceover)}</div>
-                  <div style={{ fontSize: 11, color: "#444" }}>📷 {clean(shot.visual)}</div>
-                </div>
-              </div>
-            ))}
-            <div style={{ background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 10, padding: "12px 16px", marginBottom: 10 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <div style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>CAPTION + HASHTAGS</div>
-                <CopyBtn text={`${videoData.caption}\n\n${videoData.hashtags?.join(" ")}`} />
-              </div>
-              <div style={{ fontSize: 13, color: "#888", marginBottom: 10 }}>{videoData.caption}</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {videoData.hashtags?.map((h, i) => <span key={i} style={{ background: "#111", border: "1px solid #1e1e1e", color: "#d4af37", fontSize: 11, padding: "3px 10px", borderRadius: 20, fontFamily: "monospace" }}>{h}</span>)}
-              </div>
-            </div>
-            <button onClick={() => { setVideoAnimatorIdx(0); setShowVideoAnimator(true); }} style={{ width: "100%", marginTop: 4, padding: "14px", background: "#d4af37", border: "none", color: "#000", fontSize: 14, fontWeight: 900, cursor: "pointer", borderRadius: 6 }}>🎬 Animate & Export</button>
-          </div>
-        )}
-
-        <button onClick={() => generate(selTopic)} style={{ width: "100%", marginTop: 10, padding: "13px", background: "transparent", border: "1px solid #d4af37", color: "#d4af37", fontSize: 14, fontWeight: 700, cursor: "pointer", borderRadius: 4 }}>🔄 Regenerate</button>
-      </div>
-    </div>
-  );
-
-  // ── HISTORY
   if (screen === "history") return (
-    <div style={{ minHeight: "100dvh", background: "#000", padding: "48px 20px 40px", ...S }}>
-      <div style={{ display: "flex", gap: 16, alignItems: "center", marginBottom: 28 }}>
-        <button onClick={() => setScreen("home")} style={{ background: "none", border: "none", color: "#aaa", fontSize: 22, cursor: "pointer" }}>←</button>
-        <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 900 }}>History</h2>
-      </div>
-      {history.length === 0 ? <div style={{ textAlign: "center", paddingTop: 60, color: "#222" }}>No content yet</div> : (
-        <div style={{ display: "grid", gap: 10 }}>
-          {history.map(item => {
-            const c = CATEGORIES.find(c => c.id === item.cat);
-            return (
-              <button key={item.id} onClick={() => {
-                setSelCat(item.cat); setSelOutput(item.output); setSelVideoStyle(item.style); setSelTopic(item.topic);
-                if (item.output === "cards") setCardsData(item.data); else setVideoData(item.data);
-                setScreen("result");
-              }} style={{ padding: "14px 16px", background: "#0a0a0a", border: "1px solid #1a1a1a", borderRadius: 8, cursor: "pointer", textAlign: "left" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                  <span style={{ fontSize: 11, color: "#d4af37", fontWeight: 700 }}>{c?.icon} {item.output === "cards" ? "🃏 Cards" : `🎬 Style ${item.style}`}</span>
-                  <span style={{ fontSize: 10, color: "#2a2a2a" }}>{item.at}</span>
-                </div>
-                <div style={{ fontSize: 13, color: "#888" }}>{item.topic}</div>
-              </button>
-            );
-          })}
+    <HistoryScreen
+      onBack={() => setScreen("home")}
+      onLoad={(pack) => { setCurrentPack(pack); setScreen("result"); }}
+    />
+  );
+
+  // HOME
+  return (
+    <div>
+      {error && (
+        <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 100, background: "#1a0000", border: "1px solid #3a0000", color: "#f87171", fontSize: 13, padding: "12px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span>{error}</span>
+          <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "#f87171", fontSize: 16, cursor: "pointer" }}>✕</button>
         </div>
       )}
-      <button onClick={() => { setHistory([]); localStorage.removeItem(HISTORY_STORAGE); }} style={{ width: "100%", marginTop: 16, padding: "11px", background: "transparent", border: "1px solid #1a1a1a", color: "#2a2a2a", fontSize: 12, cursor: "pointer", borderRadius: 4 }}>🗑 Clear History</button>
+      <HomeScreen
+        onGenerate={generate}
+        onHistory={() => setScreen("history")}
+        historyCount={loadHistory().length}
+      />
     </div>
   );
-
-  return null;
 }
